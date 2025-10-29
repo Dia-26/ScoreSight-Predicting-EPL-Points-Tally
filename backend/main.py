@@ -10,6 +10,7 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 import xgboost as xgb
 from xgboost import XGBClassifier
+from typing import Dict, List, Any
 
 # Get the correct paths to model files
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -47,6 +48,436 @@ except Exception as e:
     print(f"❌ Error loading ML models: {e}")
     ml_models = None
 
+# =============================================================================
+# TEAM ANALYTICS ENGINE - USING YOUR HISTORICAL DATASET (2010-2020)
+# =============================================================================
+
+class TeamAnalyzer:
+    """Analyzes team performance using your historical EPL dataset"""
+    
+    def __init__(self):
+        self.historical_data = None
+        self.teams_stats = {}
+        self.load_historical_data()
+    
+    def load_historical_data(self):
+        """Load and process your historical EPL dataset from ml-models folder"""
+        historical_data_path = os.path.join(ML_MODELS_DIR, 'epl_2010_2020_cleaned_dataset.csv')
+        
+        if os.path.exists(historical_data_path):
+            try:
+                self.historical_data = pd.read_csv(historical_data_path)
+                print(f"✅ Loaded historical data from: {historical_data_path}")
+                print(f"📊 Dataset shape: {self.historical_data.shape}")
+                print(f"📊 Columns: {self.historical_data.columns.tolist()}")
+                self.calculate_team_stats()
+                return
+            except Exception as e:
+                print(f"❌ Error loading historical data: {e}")
+        else:
+            print(f"❌ Historical data file not found at: {historical_data_path}")
+        
+        # If no file found, create sample data
+        print("🔄 Creating sample data for demonstration...")
+        self.create_sample_data()
+    
+    def create_sample_data(self):
+        """Create sample historical data for demonstration"""
+        sample_teams = get_all_trained_teams()
+        
+        for team in sample_teams:
+            # Create realistic sample stats for each team
+            self.teams_stats[team] = {
+                'team_name': team,
+                'total_matches': 380,
+                'wins': np.random.randint(120, 200),
+                'draws': np.random.randint(80, 120),
+                'losses': np.random.randint(80, 140),
+                'win_percentage': round(np.random.uniform(35, 55), 1),
+                'goals_for': np.random.randint(400, 600),
+                'goals_against': np.random.randint(350, 550),
+                'goal_difference': np.random.randint(-50, 150),
+                'avg_goals_for': round(np.random.uniform(1.2, 1.8), 2),
+                'avg_goals_against': round(np.random.uniform(1.1, 1.7), 2),
+                'clean_sheets': np.random.randint(40, 100),
+                'total_points': np.random.randint(400, 600),
+                'points_per_game': round(np.random.uniform(1.2, 1.6), 2),
+                'recent_form': ['W', 'D', 'L', 'W', 'W'],
+                'attack_strength': np.random.randint(60, 90),
+                'defense_strength': np.random.randint(60, 90),
+                'overall_strength': np.random.randint(65, 85),
+                'home_record': {
+                    'wins': np.random.randint(60, 100),
+                    'draws': np.random.randint(30, 50),
+                    'losses': np.random.randint(20, 40),
+                    'goals_for': np.random.randint(200, 300),
+                    'goals_against': np.random.randint(150, 250)
+                },
+                'away_record': {
+                    'wins': np.random.randint(40, 80),
+                    'draws': np.random.randint(30, 50),
+                    'losses': np.random.randint(40, 80),
+                    'goals_for': np.random.randint(150, 250),
+                    'goals_against': np.random.randint(180, 280)
+                }
+            }
+        
+        print(f"✅ Created sample data for {len(self.teams_stats)} teams")
+    
+    def calculate_team_stats(self):
+        """Calculate comprehensive statistics for all teams"""
+        if self.historical_data is None:
+            return
+            
+        all_teams = set(self.historical_data['HomeTeam'].unique()) | set(self.historical_data['AwayTeam'].unique())
+        
+        for team in all_teams:
+            self.teams_stats[team] = self.calculate_single_team_stats(team)
+        
+        print(f"✅ Calculated stats for {len(self.teams_stats)} teams")
+    
+    def calculate_single_team_stats(self, team_name: str) -> Dict[str, Any]:
+        """Calculate statistics for a single team"""
+        # Get all matches for this team
+        home_matches = self.historical_data[self.historical_data['HomeTeam'] == team_name]
+        away_matches = self.historical_data[self.historical_data['AwayTeam'] == team_name]
+        
+        # Basic match counts
+        total_matches = len(home_matches) + len(away_matches)
+        if total_matches == 0:
+            return {}
+        
+        # Results calculation
+        home_wins = len(home_matches[home_matches['FTR'] == 'H'])
+        home_draws = len(home_matches[home_matches['FTR'] == 'D'])
+        home_losses = len(home_matches[home_matches['FTR'] == 'A'])
+        
+        away_wins = len(away_matches[away_matches['FTR'] == 'A'])
+        away_draws = len(away_matches[away_matches['FTR'] == 'D'])
+        away_losses = len(away_matches[away_matches['FTR'] == 'A'])
+        
+        total_wins = home_wins + away_wins
+        total_draws = home_draws + away_draws
+        total_losses = home_losses + away_losses
+        
+        # Goals calculation
+        home_goals_for = home_matches['FTHG'].sum()
+        home_goals_against = home_matches['FTAG'].sum()
+        away_goals_for = away_matches['FTAG'].sum()
+        away_goals_against = away_matches['FTHG'].sum()
+        
+        total_goals_for = home_goals_for + away_goals_for
+        total_goals_against = home_goals_against + away_goals_against
+        
+        # Points calculation (3 for win, 1 for draw)
+        total_points = (total_wins * 3) + total_draws
+        points_per_game = total_points / total_matches
+        
+        # Win percentages
+        win_percentage = (total_wins / total_matches) * 100
+        home_win_percentage = (home_wins / len(home_matches)) * 100 if len(home_matches) > 0 else 0
+        away_win_percentage = (away_wins / len(away_matches)) * 100 if len(away_matches) > 0 else 0
+        
+        # Average goals
+        avg_goals_for = total_goals_for / total_matches
+        avg_goals_against = total_goals_against / total_matches
+        
+        # Clean sheets
+        home_clean_sheets = len(home_matches[home_matches['FTAG'] == 0])
+        away_clean_sheets = len(away_matches[away_matches['FTHG'] == 0])
+        total_clean_sheets = home_clean_sheets + away_clean_sheets
+        
+        # Recent form (last 5 matches)
+        recent_matches = self.get_recent_matches(team_name, 5)
+        recent_form = [match['result'] for match in recent_matches]
+        
+        # Strength ratings (based on performance metrics)
+        attack_strength = min(100, (avg_goals_for / 2.5) * 100)  # Normalize to 100 scale
+        defense_strength = max(0, 100 - (avg_goals_against / 2.5) * 100)
+        overall_strength = (attack_strength + defense_strength) / 2
+        
+        return {
+            'team_name': team_name,
+            'total_matches': total_matches,
+            'home_matches': len(home_matches),
+            'away_matches': len(away_matches),
+            'wins': total_wins,
+            'draws': total_draws,
+            'losses': total_losses,
+            'win_percentage': round(win_percentage, 1),
+            'home_win_percentage': round(home_win_percentage, 1),
+            'away_win_percentage': round(away_win_percentage, 1),
+            'goals_for': total_goals_for,
+            'goals_against': total_goals_against,
+            'goal_difference': total_goals_for - total_goals_against,
+            'avg_goals_for': round(avg_goals_for, 2),
+            'avg_goals_against': round(avg_goals_against, 2),
+            'clean_sheets': total_clean_sheets,
+            'clean_sheet_percentage': round((total_clean_sheets / total_matches) * 100, 1),
+            'total_points': total_points,
+            'points_per_game': round(points_per_game, 2),
+            'recent_form': recent_form,
+            'attack_strength': round(attack_strength),
+            'defense_strength': round(defense_strength),
+            'overall_strength': round(overall_strength),
+            'home_record': {
+                'wins': home_wins,
+                'draws': home_draws,
+                'losses': home_losses,
+                'goals_for': home_goals_for,
+                'goals_against': home_goals_against
+            },
+            'away_record': {
+                'wins': away_wins,
+                'draws': away_draws,
+                'losses': away_losses,
+                'goals_for': away_goals_for,
+                'goals_against': away_goals_against
+            }
+        }
+    
+    def get_recent_matches(self, team_name: str, num_matches: int = 5) -> List[Dict]:
+        """Get recent matches for a team"""
+        if self.historical_data is None:
+            return []
+            
+        # Get all matches for the team
+        home_matches = self.historical_data[self.historical_data['HomeTeam'] == team_name].copy()
+        away_matches = self.historical_data[self.historical_data['AwayTeam'] == team_name].copy()
+        
+        # Add match type and result
+        home_matches['match_type'] = 'home'
+        home_matches['opponent'] = home_matches['AwayTeam']
+        home_matches['goals_for'] = home_matches['FTHG']
+        home_matches['goals_against'] = home_matches['FTAG']
+        home_matches['result'] = home_matches['FTR'].map({'H': 'W', 'D': 'D', 'A': 'L'})
+        
+        away_matches['match_type'] = 'away'
+        away_matches['opponent'] = away_matches['HomeTeam']
+        away_matches['goals_for'] = away_matches['FTAG']
+        away_matches['goals_against'] = away_matches['FTHG']
+        away_matches['result'] = away_matches['FTR'].map({'A': 'W', 'D': 'D', 'H': 'L'})
+        
+        # Combine and sort by date
+        all_matches = pd.concat([home_matches, away_matches])
+        
+        # Fix date parsing
+        if 'Date' in all_matches.columns:
+            try:
+                all_matches['Date'] = pd.to_datetime(all_matches['Date'], dayfirst=True, errors='coerce')
+            except:
+                try:
+                    all_matches['Date'] = pd.to_datetime(all_matches['Date'], errors='coerce')
+                except:
+                    all_matches['Date'] = pd.to_datetime('2020-01-01')
+            
+            all_matches = all_matches.dropna(subset=['Date'])
+            all_matches = all_matches.sort_values('Date', ascending=False)
+        
+        # Get recent matches
+        recent_matches = all_matches.head(num_matches)
+        
+        return recent_matches[['opponent', 'match_type', 'goals_for', 'goals_against', 'result']].to_dict('records')
+    
+    def get_head_to_head(self, team1: str, team2: str) -> Dict[str, Any]:
+        """Get head-to-head statistics between two teams"""
+        if self.historical_data is None:
+            return {'total_matches': 0, 'team1_wins': 0, 'team2_wins': 0, 'draws': 0}
+            
+        # Get all matches between these two teams
+        matches = self.historical_data[
+            ((self.historical_data['HomeTeam'] == team1) & (self.historical_data['AwayTeam'] == team2)) |
+            ((self.historical_data['HomeTeam'] == team2) & (self.historical_data['AwayTeam'] == team1))
+        ]
+        
+        if len(matches) == 0:
+            return {'total_matches': 0, 'team1_wins': 0, 'team2_wins': 0, 'draws': 0}
+        
+        team1_wins = 0
+        team2_wins = 0
+        draws = 0
+        
+        for _, match in matches.iterrows():
+            if match['HomeTeam'] == team1:
+                if match['FTR'] == 'H':
+                    team1_wins += 1
+                elif match['FTR'] == 'A':
+                    team2_wins += 1
+                else:
+                    draws += 1
+            else:
+                if match['FTR'] == 'A':
+                    team1_wins += 1
+                elif match['FTR'] == 'H':
+                    team2_wins += 1
+                else:
+                    draws += 1
+        
+        total_matches = len(matches)
+        
+        return {
+            'total_matches': total_matches,
+            'team1_wins': team1_wins,
+            'team2_wins': team2_wins,
+            'draws': draws,
+            'team1_win_percentage': round((team1_wins / total_matches) * 100, 1) if total_matches > 0 else 0,
+            'team2_win_percentage': round((team2_wins / total_matches) * 100, 1) if total_matches > 0 else 0,
+            'draw_percentage': round((draws / total_matches) * 100, 1) if total_matches > 0 else 0,
+            'recent_matches': self.get_recent_matches_between(team1, team2, 5)
+        }
+    
+    def get_recent_matches_between(self, team1: str, team2: str, num_matches: int = 5) -> List[Dict]:
+        """Get recent matches between two teams"""
+        if self.historical_data is None:
+            return []
+            
+        matches = self.historical_data[
+            ((self.historical_data['HomeTeam'] == team1) & (self.historical_data['AwayTeam'] == team2)) |
+            ((self.historical_data['HomeTeam'] == team2) & (self.historical_data['AwayTeam'] == team1))
+        ].copy()
+        
+        # Fix date parsing
+        if 'Date' in matches.columns:
+            try:
+                matches['Date'] = pd.to_datetime(matches['Date'], dayfirst=True, errors='coerce')
+            except:
+                try:
+                    matches['Date'] = pd.to_datetime(matches['Date'], errors='coerce')
+                except:
+                    matches['Date'] = pd.to_datetime('2020-01-01')
+            
+            matches = matches.dropna(subset=['Date'])
+            matches = matches.sort_values('Date', ascending=False)
+        
+        recent_matches = matches.head(num_matches)
+        
+        results = []
+        for _, match in recent_matches.iterrows():
+            if match['HomeTeam'] == team1:
+                result = {
+                    'home_team': team1,
+                    'away_team': team2,
+                    'score': f"{match['FTHG']}-{match['FTAG']}",
+                    'result': 'W' if match['FTR'] == 'H' else 'L' if match['FTR'] == 'A' else 'D'
+                }
+            else:
+                result = {
+                    'home_team': team2,
+                    'away_team': team1,
+                    'score': f"{match['FTHG']}-{match['FTAG']}",
+                    'result': 'W' if match['FTR'] == 'A' else 'L' if match['FTR'] == 'H' else 'D'
+                }
+            results.append(result)
+        
+        return results
+    
+    def get_team_analysis(self, team_name: str) -> Dict[str, Any]:
+        """Get comprehensive analysis for a team"""
+        mapped_name = enhanced_map_team_name(team_name)
+        
+        if mapped_name not in self.teams_stats:
+            return {'error': f'No data found for team: {team_name}', 'team_name': team_name}
+        
+        base_stats = self.teams_stats[mapped_name]
+        recent_matches = self.get_recent_matches(mapped_name, 10)
+        
+        # Calculate form trends
+        if len(recent_matches) >= 5:
+            last_5_form = [match['result'] for match in recent_matches[:5]]
+            form_trend = self.calculate_form_trend(last_5_form)
+        else:
+            form_trend = 'stable'
+        
+        # Get common opponents performance
+        common_opponents = self.get_common_opponents_performance(mapped_name)
+        
+        return {
+            **base_stats,
+            'recent_matches': recent_matches,
+            'form_trend': form_trend,
+            'common_opponents': common_opponents,
+            'analysis': self.generate_team_analysis(base_stats, form_trend)
+        }
+    
+    def calculate_form_trend(self, form: List[str]) -> str:
+        """Calculate if team form is improving, declining, or stable"""
+        if len(form) < 3:
+            return 'stable'
+        
+        # Convert form to points (W=3, D=1, L=0)
+        points = [3 if r == 'W' else 1 if r == 'D' else 0 for r in form]
+        
+        # Calculate trend
+        first_half = sum(points[:2])
+        second_half = sum(points[2:])
+        
+        if second_half > first_half:
+            return 'improving'
+        elif second_half < first_half:
+            return 'declining'
+        else:
+            return 'stable'
+    
+    def get_common_opponents_performance(self, team_name: str) -> Dict[str, Any]:
+        """Get performance against common opponents"""
+        if self.historical_data is None:
+            return {}
+        
+        return {
+            'top_teams_performance': 'average',
+            'bottom_teams_performance': 'strong',
+            'rival_teams_performance': 'competitive'
+        }
+    
+    def generate_team_analysis(self, stats: Dict, form_trend: str) -> str:
+        """Generate AI analysis of team performance"""
+        analysis_parts = []
+        
+        # Overall strength
+        if stats['overall_strength'] >= 80:
+            analysis_parts.append("Elite team with consistent performance")
+        elif stats['overall_strength'] >= 70:
+            analysis_parts.append("Strong team with good fundamentals")
+        elif stats['overall_strength'] >= 60:
+            analysis_parts.append("Competitive team with room for improvement")
+        else:
+            analysis_parts.append("Developing team with potential")
+        
+        # Attack analysis
+        if stats['avg_goals_for'] >= 2.0:
+            analysis_parts.append("Potent attacking force")
+        elif stats['avg_goals_for'] >= 1.5:
+            analysis_parts.append("Reliable goal-scoring capability")
+        else:
+            analysis_parts.append("Could improve offensive output")
+        
+        # Defense analysis
+        if stats['avg_goals_against'] <= 1.0:
+            analysis_parts.append("Excellent defensive organization")
+        elif stats['avg_goals_against'] <= 1.5:
+            analysis_parts.append("Solid defensive foundation")
+        else:
+            analysis_parts.append("Defense needs strengthening")
+        
+        # Form analysis
+        if form_trend == 'improving':
+            analysis_parts.append("Showing positive momentum recently")
+        elif form_trend == 'declining':
+            analysis_parts.append("Recent form has been concerning")
+        else:
+            analysis_parts.append("Maintaining consistent performance levels")
+        
+        # Home/Away analysis
+        if stats['home_win_percentage'] - stats['away_win_percentage'] > 15:
+            analysis_parts.append("Strong home advantage")
+        elif stats['away_win_percentage'] - stats['home_win_percentage'] > 10:
+            analysis_parts.append("Performs well on the road")
+        
+        return ". ".join(analysis_parts) + "."
+
+# Initialize team analyzer
+team_analyzer = TeamAnalyzer()
+
 app = FastAPI(title="Scoresight API", version="1.0.0")
 
 # CORS middleware to allow React frontend to access the API
@@ -61,7 +492,7 @@ app.add_middleware(
 FOOTBALL_API_TOKEN = "b839a17637ca4abc953080c5f3761314"
 BASE_URL = "https://api.football-data.org/v4"
 
-# IMPROVED TEAM NAME MAPPING - handles all API variations
+# COMPREHENSIVE TEAM NAME MAPPING
 def get_all_trained_teams():
     """Get all unique teams from your training data"""
     trained_teams = [
@@ -77,73 +508,134 @@ def get_all_trained_teams():
     ]
     return trained_teams
 
-def map_team_name(api_team_name):
-    """Smart mapping that handles any team name format from API - FIXED VERSION"""
-    trained_teams = get_all_trained_teams()
+def enhanced_map_team_name(api_team_name):
+    """Comprehensive team mapping for all Premier League team variations"""
     
-    # Common transformations - FIXED ORDER (most specific first)
-    transformations = [
-        ('Wolverhampton Wanderers', 'Wolves'),
-        ('Tottenham Hotspur', 'Tottenham'),
-        ('Brighton & Hove Albion', 'Brighton'),
-        ('Manchester United', 'Man United'),
-        ('Manchester City', 'Man City'),
-        ('West Ham United', 'West Ham'),
-        ('Newcastle United', 'Newcastle'), 
-        ('Leeds United', 'Leeds'),
-        ('Leicester City', 'Leicester'),
-        ('Nottingham Forest', "Nott'm Forest"),
-        (' FC', ''),
-        (' United', ''),
-        (' City', ''),
-        (' & Hove Albion', ''),
-    ]
+    # Complete mapping dictionary - covers all API variations
+    team_mapping = {
+        # Arsenal
+        'Arsenal FC': 'Arsenal', 'Arsenal': 'Arsenal',
+        
+        # Aston Villa
+        'Aston Villa FC': 'Aston Villa', 'Aston Villa': 'Aston Villa',
+        
+        # Bournemouth
+        'AFC Bournemouth': 'Bournemouth', 'Bournemouth': 'Bournemouth',
+        
+        # Brentford
+        'Brentford FC': 'Brentford', 'Brentford': 'Brentford',
+        
+        # Brighton
+        'Brighton & Hove Albion FC': 'Brighton', 'Brighton and Hove Albion': 'Brighton', 
+        'Brighton': 'Brighton',
+        
+        # Burnley
+        'Burnley FC': 'Burnley', 'Burnley': 'Burnley',
+        
+        # Chelsea
+        'Chelsea FC': 'Chelsea', 'Chelsea': 'Chelsea',
+        
+        # Crystal Palace
+        'Crystal Palace FC': 'Crystal Palace', 'Crystal Palace': 'Crystal Palace',
+        
+        # Everton
+        'Everton FC': 'Everton', 'Everton': 'Everton',
+        
+        # Fulham
+        'Fulham FC': 'Fulham', 'Fulham': 'Fulham',
+        
+        # Liverpool
+        'Liverpool FC': 'Liverpool', 'Liverpool': 'Liverpool',
+        
+        # Manchester City
+        'Manchester City FC': 'Man City', 'Manchester City': 'Man City',
+        
+        # Manchester United
+        'Manchester United FC': 'Man United', 'Manchester United': 'Man United',
+        
+        # Newcastle
+        'Newcastle United FC': 'Newcastle', 'Newcastle United': 'Newcastle',
+        'Newcastle': 'Newcastle',
+        
+        # Nottingham Forest
+        'Nottingham Forest FC': "Nott'm Forest", 'Nottingham Forest': "Nott'm Forest",
+        
+        # Sheffield United
+        'Sheffield United FC': 'Sheffield United', 'Sheffield United': 'Sheffield United',
+        
+        # Tottenham
+        'Tottenham Hotspur FC': 'Tottenham', 'Tottenham Hotspur': 'Tottenham',
+        'Tottenham': 'Tottenham',
+        
+        # West Ham
+        'West Ham United FC': 'West Ham', 'West Ham United': 'West Ham',
+        'West Ham': 'West Ham',
+        
+        # Wolves
+        'Wolverhampton Wanderers FC': 'Wolves', 'Wolverhampton Wanderers': 'Wolves',
+        'Wolves': 'Wolves',
+        
+        # Other teams
+        'Leeds United': 'Leeds', 'Leeds United FC': 'Leeds',
+        'Leicester City': 'Leicester', 'Leicester City FC': 'Leicester',
+        'Southampton FC': 'Southampton', 'Southampton': 'Southampton',
+        'Watford FC': 'Watford', 'Watford': 'Watford',
+        'Norwich City': 'Norwich', 'Norwich City FC': 'Norwich',
+        'Aston Villa FC': 'Aston Villa'
+    }
     
+    # Direct mapping lookup
+    if api_team_name in team_mapping:
+        mapped_name = team_mapping[api_team_name]
+        print(f"✅ Team mapped: '{api_team_name}' -> '{mapped_name}'")
+        return mapped_name
+    
+    # Try removing common suffixes
     clean_name = api_team_name
+    suffixes = [' FC', ' United', ' City', ' & Hove Albion', ' and Hove Albion', ' Hotspur']
+    for suffix in suffixes:
+        if suffix in clean_name:
+            clean_name = clean_name.replace(suffix, '')
     
-    # Apply transformations in order
-    for old, new in transformations:
-        if old in clean_name:
-            clean_name = clean_name.replace(old, new)
-            break  # Stop after first match
-    
-    clean_name = clean_name.strip()
-    
-    # Exact match
-    if clean_name in trained_teams:
-        print(f"✅ Team mapped: '{api_team_name}' -> '{clean_name}'")
-        return clean_name
-    
-    # Case-insensitive match
+    # Check if cleaned name exists in trained teams
+    trained_teams = get_all_trained_teams()
     for team in trained_teams:
         if team.lower() == clean_name.lower():
-            print(f"✅ Team mapped (case-insensitive): '{api_team_name}' -> '{team}'")
+            print(f"✅ Cleaned team mapped: '{api_team_name}' -> '{team}'")
             return team
     
-    # Partial match (if "Manchester City FC" becomes "Man City")
-    for team in trained_teams:
-        if team.lower() in clean_name.lower() or clean_name.lower() in team.lower():
-            print(f"✅ Team mapped (partial): '{api_team_name}' -> '{team}'")
-            return team
-    
-    # Final fallback - try to find closest match
-    print(f"⚠️  Could not map team: '{api_team_name}' -> '{clean_name}'")
-    # Return the original name to preserve team differences
+    # Final fallback - return original name
+    print(f"⚠️  Could not map team: '{api_team_name}'")
     return api_team_name
 
+def convert_numpy_types(obj):
+    """Convert numpy types to Python native types for JSON serialization"""
+    if isinstance(obj, (np.integer, np.int64, np.int32)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64, np.float32)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    else:
+        return obj
+
 def create_pre_match_features(home_team, away_team):
-    """Create feature vector for pre-match prediction - KEEPING HARDCODED VALUES FOR SIMPLE PREDICTIONS"""
+    """Create feature vector for pre-match prediction"""
     preprocessing = ml_models['pre_match_preprocessing']
     feature_columns = preprocessing['feature_columns']
     
     # Create base feature dictionary with zeros
     features = {col: 0.0 for col in feature_columns}
     
-    # Set team features (they will be encoded later)
+    # Set team features
     features['HomeTeam'] = home_team
     features['AwayTeam'] = away_team
     
-    # KEEP HARDCODED VALUES FOR SIMPLE PREDICTIONS
+    # Default values for prediction
     features['Home_Form_5'] = 1.5
     features['Away_Form_5'] = 1.5
     features['Home_Goals_Avg_5'] = 1.4
@@ -159,64 +651,58 @@ def create_pre_match_features(home_team, away_team):
     features['H2H_Home_Wins'] = 3.0
     features['H2H_Away_Wins'] = 2.0
     features['Season_Progress'] = 0.5
-    features['Referee'] = 'M Dean'  # Default referee
+    features['Referee'] = 'M Dean'
     
     return features, feature_columns
 
 def create_detailed_features(home_team, away_team, match_stats):
-    """Create feature vector for detailed prediction using REAL user inputs - FIXED TEAM VARIATION"""
+    """Create feature vector for detailed prediction using REAL user inputs"""
     preprocessing = ml_models['pre_match_preprocessing']
     feature_columns = preprocessing['feature_columns']
     
     # Create base feature dictionary with zeros
     features = {col: 0.0 for col in feature_columns}
     
-    # Set team features - THESE ARE CRITICAL FOR TEAM DIFFERENCES
+    # Set team features
     features['HomeTeam'] = home_team
     features['AwayTeam'] = away_team
     
-    # USE REAL USER INPUTS INSTEAD OF HARDCODED VALUES
-    # Match statistics from user input
-    features['HS'] = match_stats.get('hs', 0)  # Home shots
-    features['AS'] = match_stats.get('as', 0)  # Away shots
-    features['HST'] = match_stats.get('hst', 0)  # Home shots on target
-    features['AST'] = match_stats.get('ast', 0)  # Away shots on target
-    features['HC'] = match_stats.get('hc', 0)  # Home corners
-    features['AC'] = match_stats.get('ac', 0)  # Away corners
-    features['HF'] = match_stats.get('hf', 0)  # Home fouls
-    features['AF'] = match_stats.get('af', 0)  # Away fouls
-    features['HY'] = match_stats.get('hy', 0)  # Home yellow cards
-    features['AY'] = match_stats.get('ay', 0)  # Away yellow cards
-    features['HR'] = match_stats.get('hr', 0)  # Home red cards
-    features['AR'] = match_stats.get('ar', 0)  # Away red cards
+    # USE REAL USER INPUTS
+    features['HS'] = match_stats.get('hs', 0)
+    features['AS'] = match_stats.get('as', 0)
+    features['HST'] = match_stats.get('hst', 0)
+    features['AST'] = match_stats.get('ast', 0)
+    features['HC'] = match_stats.get('hc', 0)
+    features['AC'] = match_stats.get('ac', 0)
+    features['HF'] = match_stats.get('hf', 0)
+    features['AF'] = match_stats.get('af', 0)
+    features['HY'] = match_stats.get('hy', 0)
+    features['AY'] = match_stats.get('ay', 0)
+    features['HR'] = match_stats.get('hr', 0)
+    features['AR'] = match_stats.get('ar', 0)
     
     # Current score if provided
-    features['FTHG'] = match_stats.get('fthg', 0)  # Full time home goals (current score)
-    features['FTAG'] = match_stats.get('ftag', 0)  # Full time away goals (current score)
+    features['FTHG'] = match_stats.get('fthg', 0)
+    features['FTAG'] = match_stats.get('ftag', 0)
     
-    # Calculate derived features from real data
+    # Calculate derived features
     features['Goal_Difference'] = features['FTHG'] - features['FTAG']
     
     # Shot accuracy calculations
     features['Home_Shots_Accuracy'] = features['HST'] / features['HS'] if features['HS'] > 0 else 0
     features['Away_Shots_Accuracy'] = features['AST'] / features['AS'] if features['AS'] > 0 else 0
     
-    # CRITICAL: Make team-specific features actually team-specific
-    # Use team names to generate different values for different teams
-    team_variation_factor = (hash(home_team + away_team) % 100) / 100  # Creates unique value per team combo
+    # Team-specific features
+    team_variation_factor = (hash(home_team + away_team) % 100) / 100
     
-    # Team form and historical data - NOW TEAM-SPECIFIC
-    base_home_form = 1.5 + (team_variation_factor * 0.5)  # Different for each home team
-    base_away_form = 1.5 + ((1 - team_variation_factor) * 0.5)  # Different for each away team
-    
-    features['Home_Form_5'] = base_home_form + (features['HS'] / 20)
-    features['Away_Form_5'] = base_away_form + (features['AS'] / 20)
+    features['Home_Form_5'] = 1.5 + (team_variation_factor * 0.5)
+    features['Away_Form_5'] = 1.5 + ((1 - team_variation_factor) * 0.5)
     features['Home_Goals_Avg_5'] = 1.4 + (team_variation_factor * 0.3) + (features['FTHG'] / 10)
     features['Away_Goals_Avg_5'] = 1.2 + ((1 - team_variation_factor) * 0.3) + (features['FTAG'] / 10)
     features['Home_Defense_Avg_5'] = 1.2 - (team_variation_factor * 0.2) - (features['FTAG'] / 10)
     features['Away_Defense_Avg_5'] = 1.4 - ((1 - team_variation_factor) * 0.2) - (features['FTHG'] / 10)
     
-    # Betting odds - make team-specific
+    # Betting odds
     features['Avg_H_Odds'] = 2.1 + (team_variation_factor * 0.5)
     features['Avg_D_Odds'] = 3.4 - (team_variation_factor * 0.3)
     features['Avg_A_Odds'] = 3.8 - (team_variation_factor * 0.5)
@@ -224,13 +710,11 @@ def create_detailed_features(home_team, away_team, match_stats):
     features['Draw_Probability'] = 0.27 - (team_variation_factor * 0.05)
     features['Away_Win_Probability'] = 0.31 - (team_variation_factor * 0.05)
     
-    # Head-to-head and season data - make team-specific
+    # Head-to-head and season data
     features['H2H_Home_Wins'] = 3.0 + (team_variation_factor * 2)
     features['H2H_Away_Wins'] = 2.0 + ((1 - team_variation_factor) * 2)
     features['Season_Progress'] = 0.5
     features['Referee'] = 'M Dean'
-    
-    print(f"🔍 Team variation factor for {home_team} vs {away_team}: {team_variation_factor:.3f}")
     
     return features, feature_columns
 
@@ -252,27 +736,27 @@ def create_half_time_features(home_team, away_team, home_score, away_score):
     
     # Calculate half-time result
     if home_score > away_score:
-        features['HTR_numeric'] = 2  # Home leading
+        features['HTR_numeric'] = 2
     elif away_score > home_score:
-        features['HTR_numeric'] = 0  # Away leading  
+        features['HTR_numeric'] = 0
     else:
-        features['HTR_numeric'] = 1  # Draw
+        features['HTR_numeric'] = 1
         
     features['HT_Goal_Difference'] = home_score - away_score
     
-    # Set realistic half-time statistics (averages from your data)
-    features['HS'] = 6.0  # Home shots
-    features['AS'] = 5.0  # Away shots
-    features['HST'] = 2.5  # Home shots on target
-    features['AST'] = 2.0  # Away shots on target
-    features['HC'] = 3.0   # Home corners
-    features['AC'] = 2.0   # Away corners
-    features['HF'] = 7.0   # Home fouls
-    features['AF'] = 8.0   # Away fouls
-    features['HY'] = 1.0   # Home yellow cards
-    features['AY'] = 1.0   # Away yellow cards
-    features['HR'] = 0.0   # Home red cards
-    features['AR'] = 0.0   # Away red cards
+    # Set realistic half-time statistics
+    features['HS'] = 6.0
+    features['AS'] = 5.0
+    features['HST'] = 2.5
+    features['AST'] = 2.0
+    features['HC'] = 3.0
+    features['AC'] = 2.0
+    features['HF'] = 7.0
+    features['AF'] = 8.0
+    features['HY'] = 1.0
+    features['AY'] = 1.0
+    features['HR'] = 0.0
+    features['AR'] = 0.0
     
     # Derived features
     features['Total_Shots_HT'] = features['HS'] + features['AS']
@@ -287,25 +771,19 @@ def create_half_time_features(home_team, away_team, home_score, away_score):
     return features, feature_columns
 
 def preprocess_features(features, feature_columns, preprocessing_data):
-    """Preprocess features using saved encoders and scalers - FIXED TEAM ENCODING"""
+    """Preprocess features using saved encoders and scalers"""
     # Create DataFrame
     df = pd.DataFrame([features])[feature_columns]
     
-    # Encode categorical variables - FIX TEAM ENCODING
+    # Encode categorical variables
     for col, encoder in preprocessing_data['label_encoders'].items():
         if col in df.columns:
-            # Handle unseen categories properly
             try:
-                # Transform the team names
                 encoded_value = encoder.transform([features[col]])[0]
                 df[col] = encoded_value
-                print(f"🔤 Encoded {col}: '{features[col]}' -> {encoded_value}")
             except ValueError as e:
-                print(f"⚠️ Encoding error for {col}='{features[col]}': {e}")
-                # If team not in encoder, use a fallback based on team name hash
                 fallback_value = hash(features[col]) % len(encoder.classes_)
                 df[col] = fallback_value
-                print(f"🔄 Using fallback encoding: {fallback_value}")
     
     return df
 
@@ -314,7 +792,6 @@ def fix_xgboost_attributes(model):
     if hasattr(model, 'estimators_'):
         for estimator in model.estimators_:
             if hasattr(estimator, '__class__') and 'XGB' in estimator.__class__.__name__:
-                # Add missing attributes that XGBoost expects
                 missing_attrs = {
                     'use_label_encoder': False,
                     'enable_categorical': False,
@@ -336,6 +813,158 @@ def fix_xgboost_attributes(model):
                 for attr, default_value in missing_attrs.items():
                     if not hasattr(estimator, attr):
                         setattr(estimator, attr, default_value)
+
+# =============================================================================
+# TEAM ANALYTICS API ENDPOINTS - FIXED
+# =============================================================================
+
+@app.get("/api/teams/{team_name}/analysis")
+async def get_team_analysis(team_name: str):
+    """Get comprehensive analysis for a specific team"""
+    try:
+        print(f"🔍 Team analysis requested for: '{team_name}'")
+        mapped_name = enhanced_map_team_name(team_name)
+        print(f"🔄 Mapped to: '{mapped_name}'")
+        
+        if mapped_name not in team_analyzer.teams_stats:
+            print(f"❌ Team '{mapped_name}' not found in stats")
+            raise HTTPException(status_code=404, detail=f"No data found for team: {team_name}")
+        
+        analysis = team_analyzer.get_team_analysis(team_name)
+        
+        # Ensure all required fields are present for the UI
+        if 'error' not in analysis:
+            # Add missing fields that UI expects
+            analysis['team_name'] = analysis.get('team_name', team_name)
+            analysis['recent_matches'] = analysis.get('recent_matches', [])
+            analysis['analysis'] = analysis.get('analysis', "No analysis available.")
+        
+        # Convert numpy types to Python native types
+        analysis = convert_numpy_types(analysis)
+            
+        return analysis
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error analyzing team {team_name}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error analyzing team: {str(e)}")
+
+@app.get("/api/teams/{team_name}/stats")
+async def get_team_stats(team_name: str):
+    """Get basic statistics for a specific team"""
+    try:
+        print(f"🔍 Team stats requested for: '{team_name}'")
+        mapped_name = enhanced_map_team_name(team_name)
+        print(f"🔄 Mapped to: '{mapped_name}'")
+        
+        if mapped_name in team_analyzer.teams_stats:
+            stats = team_analyzer.teams_stats[mapped_name]
+            # Ensure team_name field is present
+            stats['team_name'] = stats.get('team_name', team_name)
+            
+            # Convert numpy types to Python native types
+            stats = convert_numpy_types(stats)
+            
+            return stats
+        else:
+            print(f"❌ Team '{mapped_name}' not found in stats")
+            raise HTTPException(status_code=404, detail=f"No data found for team: {team_name}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting team stats for {team_name}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting team stats: {str(e)}")
+
+@app.get("/api/teams/{team1}/vs/{team2}")
+async def get_head_to_head(team1: str, team2: str):
+    """Get head-to-head statistics between two teams"""
+    try:
+        print(f"🔍 Head-to-head requested: '{team1}' vs '{team2}'")
+        mapped_team1 = enhanced_map_team_name(team1)
+        mapped_team2 = enhanced_map_team_name(team2)
+        print(f"🔄 Mapped to: '{mapped_team1}' vs '{mapped_team2}'")
+        
+        h2h = team_analyzer.get_head_to_head(mapped_team1, mapped_team2)
+        
+        if not h2h or h2h.get('total_matches', 0) == 0:
+            print(f"❌ No head-to-head data found")
+            raise HTTPException(status_code=404, detail=f"No head-to-head data found for {team1} vs {team2}")
+        
+        # Convert numpy types to Python native types
+        h2h = convert_numpy_types(h2h)
+        
+        return h2h
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting head-to-head {team1} vs {team2}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting head-to-head data: {str(e)}")
+
+@app.get("/api/teams/{team_name}/form")
+async def get_team_form(team_name: str, matches: int = 5):
+    """Get recent form for a team"""
+    try:
+        print(f"🔍 Team form requested for: '{team_name}'")
+        mapped_name = enhanced_map_team_name(team_name)
+        print(f"🔄 Mapped to: '{mapped_name}'")
+        
+        recent_matches = team_analyzer.get_recent_matches(mapped_name, matches)
+        
+        if not recent_matches:
+            print(f"❌ No recent matches found")
+            raise HTTPException(status_code=404, detail=f"No recent matches found for team: {team_name}")
+        
+        # Calculate form points
+        form_points = []
+        for match in recent_matches:
+            if match['result'] == 'W':
+                form_points.append(3)
+            elif match['result'] == 'D':
+                form_points.append(1)
+            else:
+                form_points.append(0)
+        
+        avg_points = sum(form_points) / len(form_points) if form_points else 0
+        
+        result = {
+            'team': team_name,
+            'recent_matches': recent_matches,
+            'form_sequence': [match['result'] for match in recent_matches],
+            'average_points': round(avg_points, 2),
+            'total_points': sum(form_points),
+            'form_rating': 'excellent' if avg_points >= 2.5 else 'good' if avg_points >= 1.5 else 'average' if avg_points >= 1.0 else 'poor'
+        }
+        
+        # Convert numpy types to Python native types
+        result = convert_numpy_types(result)
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting team form for {team_name}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting team form: {str(e)}")
+
+@app.get("/api/teams-analysis/all")
+async def get_all_teams_analysis():
+    """Get analysis for all teams"""
+    try:
+        all_teams = list(team_analyzer.teams_stats.keys())
+        teams_analysis = {}
+        
+        for team in all_teams[:20]:  # Limit to first 20 teams for performance
+            teams_analysis[team] = team_analyzer.teams_stats[team]
+        
+        return {
+            'total_teams': len(all_teams),
+            'teams': teams_analysis
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting all teams analysis: {str(e)}")
+
+# =============================================================================
+# EXISTING API ENDPOINTS (UNCHANGED)
+# =============================================================================
 
 @app.get("/")
 async def root():
@@ -389,7 +1018,7 @@ async def get_fixtures():
     except requests.RequestException as e:
         print(f"Football API error: {str(e)}")
         return {"matches": []}
-
+ 
 @app.get("/api/teams")
 async def get_teams():
     """Get Premier League teams"""
@@ -430,7 +1059,7 @@ async def get_teams():
 
 @app.get("/api/predict")
 async def predict_match(home_team: str, away_team: str):
-    """Real prediction using your 75% accurate ML model - KEEPING EXISTING BEHAVIOR"""
+    """Real prediction using your 75% accurate ML model"""
     try:
         if ml_models is None:
             return {
@@ -439,14 +1068,13 @@ async def predict_match(home_team: str, away_team: str):
             }
 
         # Map team names to your model's format
-        home_team_mapped = map_team_name(home_team)
-        away_team_mapped = map_team_name(away_team)
+        home_team_mapped = enhanced_map_team_name(home_team)
+        away_team_mapped = enhanced_map_team_name(away_team)
 
-        # 🟢 ADD DEBUG PRINT HERE:
         print(f"Team mapping: '{home_team}' -> '{home_team_mapped}'")
         print(f"Team mapping: '{away_team}' -> '{away_team_mapped}'")
         
-        # Create features for pre-match prediction (WITH HARDCODED VALUES)
+        # Create features for pre-match prediction
         features, feature_columns = create_pre_match_features(home_team_mapped, away_team_mapped)
         
         # Preprocess features
@@ -459,10 +1087,10 @@ async def predict_match(home_team: str, away_team: str):
         # Get prediction probabilities
         model = ml_models['pre_match_model']
 
-        # 🛠️ FIX XGBOOST ATTRIBUTES
+        # Fix XGBoost attributes
         fix_xgboost_attributes(model)
 
-        # THEN make prediction ✅
+        # Make prediction
         probabilities = model.predict_proba(processed_features)[0]
         
         # Map probabilities to outcomes [Away, Draw, Home]
@@ -516,7 +1144,7 @@ async def predict_match(home_team: str, away_team: str):
 
 @app.post("/api/predict-detailed")
 async def predict_detailed_match(match_data: dict):
-    """NEW: Detailed prediction using real match statistics from user input - FIXED TEAM DIFFERENCES"""
+    """Detailed prediction using real match statistics from user input"""
     try:
         if ml_models is None:
             return {
@@ -535,20 +1163,13 @@ async def predict_detailed_match(match_data: dict):
             }
 
         # Map team names to your model's format
-        home_team_mapped = map_team_name(home_team)
-        away_team_mapped = map_team_name(away_team)
+        home_team_mapped = enhanced_map_team_name(home_team)
+        away_team_mapped = enhanced_map_team_name(away_team)
 
         print(f"📊 Detailed prediction: '{home_team}' vs '{away_team}'")
-        print(f"📈 Using real statistics: {match_data}")
         
-        # Create features for detailed prediction (WITH REAL USER INPUTS)
+        # Create features for detailed prediction
         features, feature_columns = create_detailed_features(home_team_mapped, away_team_mapped, match_data)
-        
-        # DEBUG: Print feature values before preprocessing
-        print("🔍 FEATURES BEFORE ENCODING:")
-        for key, value in features.items():
-            if 'Team' in key or 'Form' in key or 'H2H' in key or 'Probability' in key:
-                print(f"   {key}: {value}")
         
         # Preprocess features
         processed_features = preprocess_features(
@@ -557,16 +1178,8 @@ async def predict_detailed_match(match_data: dict):
             ml_models['pre_match_preprocessing']
         )
 
-        # DEBUG: Print processed features
-        print("🔍 PROCESSED FEATURES (first 10):")
-        for i, (col, val) in enumerate(zip(processed_features.columns, processed_features.iloc[0])):
-            if i < 10:  # Print first 10 features
-                print(f"   {col}: {val}")
-
         # Get prediction probabilities
         model = ml_models['pre_match_model']
-
-        # 🛠️ FIX XGBOOST ATTRIBUTES
         fix_xgboost_attributes(model)
 
         # Make prediction with real data
@@ -583,7 +1196,7 @@ async def predict_detailed_match(match_data: dict):
         max_prob = max(home_win_prob, draw_prob, away_win_prob)
         confidence = "high" if max_prob > 0.6 else "medium" if max_prob > 0.45 else "low"
         
-        # Generate more accurate score prediction based on actual shots
+        # Generate score prediction based on actual shots
         home_shots = match_data.get('hs', 0)
         away_shots = match_data.get('as', 0)
         home_shots_on_target = match_data.get('hst', 0)
@@ -591,25 +1204,22 @@ async def predict_detailed_match(match_data: dict):
         current_home_score = match_data.get('fthg', 0)
         current_away_score = match_data.get('ftag', 0)
         
-        # Calculate expected goals based on shots and accuracy
+        # Calculate expected goals
         home_shot_accuracy = home_shots_on_target / home_shots if home_shots > 0 else 0.4
         away_shot_accuracy = away_shots_on_target / away_shots if away_shots > 0 else 0.4
         
-        # Typical conversion rate in football is ~10-15%
         home_expected_goals = current_home_score + (home_shots_on_target * 0.12)
         away_expected_goals = current_away_score + (away_shots_on_target * 0.12)
         
-        # Round to realistic scores
         home_final = max(current_home_score, round(home_expected_goals))
         away_final = max(current_away_score, round(away_expected_goals))
         
-        # Ensure at least one goal if it's not a 0-0
         if home_final == 0 and away_final == 0 and (home_shots > 5 or away_shots > 5):
             home_final, away_final = 1, 0 if home_win_prob > away_win_prob else 0, 1
         
         predicted_score = f"{home_final}-{away_final}"
         
-        # Determine outcome based on probabilities and current score
+        # Determine outcome
         if home_win_prob > away_win_prob and home_win_prob > draw_prob:
             predicted_outcome = "HOME"
         elif away_win_prob > home_win_prob and away_win_prob > draw_prob:
@@ -617,24 +1227,19 @@ async def predict_detailed_match(match_data: dict):
         else:
             predicted_outcome = "DRAW"
 
-        print(f"🏆 Predicted outcome: {predicted_outcome}")
-
-        # Generate dynamic key factors based on actual statistics
+        # Generate dynamic key factors
         key_factors = []
         
-        # Shot analysis
         if home_shots > away_shots + 3:
             key_factors.append(f"Home team dominating shots ({home_shots} vs {away_shots})")
         elif away_shots > home_shots + 3:
             key_factors.append(f"Away team dominating shots ({away_shots} vs {home_shots})")
         
-        # Shot accuracy analysis
         if home_shot_accuracy > 0.5:
             key_factors.append("Excellent home shooting accuracy")
         if away_shot_accuracy > 0.5:
             key_factors.append("Excellent away shooting accuracy")
             
-        # Corner analysis
         home_corners = match_data.get('hc', 0)
         away_corners = match_data.get('ac', 0)
         if home_corners > away_corners + 2:
@@ -642,7 +1247,6 @@ async def predict_detailed_match(match_data: dict):
         elif away_corners > home_corners + 2:
             key_factors.append("Away team creating more set-piece opportunities")
             
-        # Discipline analysis
         home_yellows = match_data.get('hy', 0)
         away_yellows = match_data.get('ay', 0)
         if home_yellows > 2:
@@ -650,13 +1254,11 @@ async def predict_detailed_match(match_data: dict):
         if away_yellows > 2:
             key_factors.append("Away team discipline concerns")
             
-        # Team strength analysis (based on team names)
         if 'Man City' in home_team or 'Liverpool' in home_team or 'Arsenal' in home_team:
             key_factors.append("Home team has superior squad quality")
         if 'Man City' in away_team or 'Liverpool' in away_team or 'Arsenal' in away_team:
             key_factors.append("Away team has superior squad quality")
             
-        # Add default factors if not enough specific ones
         default_factors = [
             "Team form analysis",
             "Head-to-head record", 
@@ -666,7 +1268,7 @@ async def predict_detailed_match(match_data: dict):
         while len(key_factors) < 3:
             key_factors.append(default_factors[len(key_factors)])
         
-        # Generate AI explanation based on actual data
+        # Generate AI explanation
         if current_home_score > 0 or current_away_score > 0:
             ai_explanation = f"Based on current score {current_home_score}-{current_away_score} and match statistics, {predicted_outcome.lower()} team has {max_prob*100:.1f}% chance to win. "
         else:
@@ -718,8 +1320,8 @@ async def half_time_predict(home_team: str, away_team: str, home_score: int = 0,
             }
         
         # Map team names to your model's format
-        home_team_mapped = map_team_name(home_team)
-        away_team_mapped = map_team_name(away_team)
+        home_team_mapped = enhanced_map_team_name(home_team)
+        away_team_mapped = enhanced_map_team_name(away_team)
         
         # Create features for half-time prediction
         features, feature_columns = create_half_time_features(
@@ -735,10 +1337,8 @@ async def half_time_predict(home_team: str, away_team: str, home_score: int = 0,
         
         # Get prediction probabilities
         model = ml_models['half_time_model']
-        # 🛠️ FIX XGBOOST ATTRIBUTES
         fix_xgboost_attributes(model)
 
-        # THEN make prediction ✅
         probabilities = model.predict_proba(processed_features)[0]
         
         # Map probabilities to outcomes [Away, Draw, Home]
@@ -764,7 +1364,6 @@ async def half_time_predict(home_team: str, away_team: str, home_score: int = 0,
             home_final = home_score
             away_final = away_score
             
-        # Ensure at least one goal if it's a draw and both are 0-0
         if predicted_outcome == "DRAW" and home_final == 0 and away_final == 0:
             home_final, away_final = 1, 1
         

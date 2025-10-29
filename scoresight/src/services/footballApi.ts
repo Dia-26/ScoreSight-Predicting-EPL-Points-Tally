@@ -23,6 +23,15 @@ export const footballAPI = {
   
   // Get all Premier League teams
   getTeams: () => fetchFromAPI('/api/teams'),
+  
+  // Team Analytics APIs
+  getTeamAnalysis: (teamName: string) => fetchFromAPI(`/api/teams/${teamName}/analysis`),
+  
+  getTeamStats: (teamName: string) => fetchFromAPI(`/api/teams/${teamName}/stats`),
+  
+  getHeadToHead: (team1: string, team2: string) => fetchFromAPI(`/api/teams/${team1}/vs/${team2}`),
+  
+  getTeamForm: (teamName: string, matches: number = 5) => fetchFromAPI(`/api/teams/${teamName}/form?matches=${matches}`),
 };
 
 // Utility functions for data transformation

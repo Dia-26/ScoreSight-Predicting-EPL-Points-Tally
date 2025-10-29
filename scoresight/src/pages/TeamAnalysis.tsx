@@ -11,7 +11,9 @@ import {
   Tab,
   Chip,
   Button,
-  Grid
+  Grid,
+  CircularProgress,
+  Alert
 } from '@mui/material';
 import {
   TrendingUp,
@@ -33,24 +35,51 @@ interface Team {
   crest: string;
 }
 
-interface Match {
-  opponent: string;
-  result: string;
-  score: string;
-  home: boolean;
-}
-
-interface UpcomingMatch {
-  opponent: string;
-  home: boolean;
-  date: string;
+interface TeamStats {
+  team_name: string;
+  total_matches: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  win_percentage: number;
+  goals_for: number;
+  goals_against: number;
+  goal_difference: number;
+  avg_goals_for: number;
+  avg_goals_against: number;
+  clean_sheets: number;
+  total_points: number;
+  points_per_game: number;
+  recent_form: string[];
+  attack_strength: number;
+  defense_strength: number;
+  overall_strength: number;
+  home_record: {
+    wins: number;
+    draws: number;
+    losses: number;
+    goals_for: number;
+    goals_against: number;
+  };
+  away_record: {
+    wins: number;
+    draws: number;
+    losses: number;
+    goals_for: number;
+    goals_against: number;
+  };
+  recent_matches?: any[];
+  analysis?: string;
 }
 
 const TeamAnalysis: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [teamStats, setTeamStats] = useState<TeamStats | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [teamsLoading, setTeamsLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch teams from API
   useEffect(() => {
@@ -65,6 +94,7 @@ const TeamAnalysis: React.FC = () => {
       } catch (error) {
         console.error('Error fetching teams:', error);
         setTeams([]);
+        setError('Failed to load teams');
       } finally {
         setTeamsLoading(false);
       }
@@ -73,30 +103,28 @@ const TeamAnalysis: React.FC = () => {
     fetchTeams();
   }, []);
 
-  // Mock team stats (will be replaced with real API data)
-  const teamStats = {
-    form: ['W', 'W', 'D', 'L', 'W'],
-    attack: 84,
-    defense: 76,
-    midfield: 79,
-    overall: 81,
-    position: 3,
-    points: 45,
-    goalsFor: 38,
-    goalsAgainst: 19,
-    last5Matches: [
-      { opponent: 'MCI', result: 'W', score: '2-1', home: true },
-      { opponent: 'ARS', result: 'D', score: '1-1', home: false },
-      { opponent: 'CHE', result: 'W', score: '3-0', home: true },
-      { opponent: 'TOT', result: 'L', score: '0-2', home: false },
-      { opponent: 'NEW', result: 'W', score: '2-0', home: true }
-    ],
-    upcomingMatches: [
-      { opponent: 'LIV', home: false, date: '2024-01-20' },
-      { opponent: 'BHA', home: true, date: '2024-01-27' },
-      { opponent: 'MUN', home: false, date: '2024-02-03' }
-    ]
-  };
+  // Fetch team stats when selected team changes
+  useEffect(() => {
+    const fetchTeamStats = async () => {
+      if (!selectedTeam) return;
+      
+      setStatsLoading(true);
+      setError(null);
+      
+      try {
+        const stats = await footballAPI.getTeamAnalysis(selectedTeam.name);
+        setTeamStats(stats);
+      } catch (error) {
+        console.error('Error fetching team stats:', error);
+        setError('Failed to load team statistics');
+        setTeamStats(null);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    fetchTeamStats();
+  }, [selectedTeam]);
 
   const StatCard: React.FC<{ title: string; value: number; max?: number; color?: string }> = 
     ({ title, value, max = 100, color = '#00d4ff' }) => (
@@ -132,17 +160,10 @@ const TeamAnalysis: React.FC = () => {
     );
   };
 
-  // Helper function to find team by short name
-  const findTeamByShortName = (shortName: string) => 
-    teams.find(team => team.shortName === shortName);
-
   if (teamsLoading) {
     return (
-      <Box>
-        <Typography variant="h3" component="h1" gutterBottom>
-          Team Analysis
-        </Typography>
-        <Typography variant="body1">Loading teams...</Typography>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
       </Box>
     );
   }
@@ -153,7 +174,7 @@ const TeamAnalysis: React.FC = () => {
         <Typography variant="h3" component="h1" gutterBottom>
           Team Analysis
         </Typography>
-        <Typography variant="body1">No teams available</Typography>
+        <Alert severity="error">No teams available</Alert>
       </Box>
     );
   }
@@ -170,6 +191,12 @@ const TeamAnalysis: React.FC = () => {
         </Typography>
       </Box>
 
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
       {/* Team Selection */}
       <Card sx={{ mb: 4, background: 'linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)' }}>
         <CardContent>
@@ -183,7 +210,7 @@ const TeamAnalysis: React.FC = () => {
                 key={team.id}
                 variant={selectedTeam.id === team.id ? "contained" : "outlined"}
                 onClick={() => setSelectedTeam(team)}
-                startIcon={<Avatar sx={{ width: 24, height: 24 }}>{team.crest}</Avatar>}
+                startIcon={<Avatar sx={{ width: 24, height: 24 }} src={team.crest} />}
                 sx={{
                   background: selectedTeam.id === team.id 
                     ? 'linear-gradient(45deg, #00d4ff, #0099cc)' 
@@ -198,163 +225,213 @@ const TeamAnalysis: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Team Overview */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' }, gap: 4, mb: 4 }}>
-        {/* Main Stats */}
-        <Card sx={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)' }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-              <Avatar sx={{ width: 60, height: 60, bgcolor: 'primary.main', mr: 2, fontSize: '1.5rem' }}>
-                {selectedTeam.crest}
-              </Avatar>
-              <Box>
-                <Typography variant="h4" fontWeight="700">
-                  {selectedTeam.name}
+      {statsLoading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress />
+          <Typography variant="body1" sx={{ ml: 2 }}>
+            Loading {selectedTeam.name} statistics...
+          </Typography>
+        </Box>
+      ) : teamStats ? (
+        <>
+          {/* Team Overview */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' }, gap: 4, mb: 4 }}>
+            {/* Main Stats */}
+            <Card sx={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                  <Avatar sx={{ width: 60, height: 60, bgcolor: 'primary.main', mr: 2, fontSize: '1.5rem' }}>
+                    {selectedTeam.shortName.charAt(0)}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h4" fontWeight="700">
+                      {selectedTeam.name}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
+                      <Chip 
+                        icon={<EmojiEvents />} 
+                        label={`Win Rate: ${teamStats.win_percentage}%`} 
+                        color="primary" 
+                        variant="outlined"
+                      />
+                      <Chip 
+                        icon={<TrendingUp />} 
+                        label={`PPG: ${teamStats.points_per_game}`} 
+                        color="success" 
+                        variant="outlined"
+                      />
+                    </Box>
+                  </Box>
+                </Box>
+
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 2 }}>
+                  <StatCard title="Attack" value={teamStats.attack_strength} color="#00ff88" />
+                  <StatCard title="Defense" value={teamStats.defense_strength} color="#00d4ff" />
+                  <StatCard title="Overall" value={teamStats.overall_strength} color="#ffaa00" />
+                  <StatCard title="Clean Sheets" value={teamStats.clean_sheets} color="#ff6bff" />
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Form Guide */}
+            <Card sx={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)' }}>
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                  <TrendingUp sx={{ mr: 1 }} />
+                  FORM GUIDE
                 </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
-                  <Chip 
-                    icon={<EmojiEvents />} 
-                    label={`Position: ${teamStats.position}`} 
-                    color="primary" 
-                    variant="outlined"
-                  />
-                  <Chip 
-                    icon={<TrendingUp />} 
-                    label={`Points: ${teamStats.points}`} 
-                    color="success" 
-                    variant="outlined"
-                  />
+                <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
+                  {teamStats.recent_form.map((result, index) => (
+                    <FormIndicator key={index} result={result} />
+                  ))}
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2">Goals For</Typography>
+                  <Typography variant="body2" fontWeight="600" color="#00ff88">
+                    {teamStats.goals_for}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2">Goals Against</Typography>
+                  <Typography variant="body2" fontWeight="600" color="#ff4444">
+                    {teamStats.goals_against}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2">Goal Difference</Typography>
+                  <Typography variant="body2" fontWeight="600" color={teamStats.goal_difference >= 0 ? "#00ff88" : "#ff4444"}>
+                    {teamStats.goal_difference > 0 ? '+' : ''}{teamStats.goal_difference}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+
+          {/* Tabs for Detailed Analysis */}
+          <Paper sx={{ background: 'transparent' }}>
+            <Tabs
+              value={activeTab}
+              onChange={(_, newValue) => setActiveTab(newValue)}
+              sx={{
+                '& .MuiTab-root': { color: 'text.secondary', fontWeight: 600 },
+                '& .Mui-selected': { color: 'primary.main' }
+              }}
+            >
+              <Tab icon={<SportsSoccer />} label="Recent Matches" />
+              <Tab icon={<Equalizer />} label="Performance" />
+              <Tab icon={<Insights />} label="Analysis" />
+            </Tabs>
+
+            {/* Recent Matches */}
+            {activeTab === 0 && (
+              <Box sx={{ mt: 3 }}>
+                {teamStats.recent_matches && teamStats.recent_matches.length > 0 ? (
+                  teamStats.recent_matches.map((match, index) => (
+                    <Card key={index} sx={{ mb: 2, background: 'linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)' }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <FormIndicator result={match.result} />
+                            <Box>
+                              <Typography variant="body1" fontWeight="600">
+                                vs {match.opponent}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {match.match_type === 'home' ? 'Home' : 'Away'} • {match.goals_for}-{match.goals_against}
+                              </Typography>
+                            </Box>
+                          </Box>
+                          <Chip 
+                            label={match.result === 'W' ? 'WIN' : match.result === 'D' ? 'DRAW' : 'LOSS'}
+                            color={match.result === 'W' ? 'success' : match.result === 'D' ? 'warning' : 'error'}
+                            size="small"
+                          />
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
+                    No recent matches data available.
+                  </Typography>
+                )}
+              </Box>
+            )}
+            {/* Performance */}
+{activeTab === 1 && (
+  <Box sx={{ mt: 3 }}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+      <Card sx={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)' }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>Home Record</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+            <Typography>Wins:</Typography>
+            <Typography fontWeight="600">{teamStats.home_record.wins}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+            <Typography>Draws:</Typography>
+            <Typography fontWeight="600">{teamStats.home_record.draws}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+            <Typography>Losses:</Typography>
+            <Typography fontWeight="600">{teamStats.home_record.losses}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography>Goals:</Typography>
+            <Typography fontWeight="600">{teamStats.home_record.goals_for}-{teamStats.home_record.goals_against}</Typography>
+          </Box>
+        </CardContent>
+      </Card>
+      <Card sx={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)' }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>Away Record</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+            <Typography>Wins:</Typography>
+            <Typography fontWeight="600">{teamStats.away_record.wins}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+            <Typography>Draws:</Typography>
+            <Typography fontWeight="600">{teamStats.away_record.draws}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+            <Typography>Losses:</Typography>
+            <Typography fontWeight="600">{teamStats.away_record.losses}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography>Goals:</Typography>
+            <Typography fontWeight="600">{teamStats.away_record.goals_for}-{teamStats.away_record.goals_against}</Typography>
+          </Box>
+        </CardContent>
+      </Card>
+    </Box>
+  </Box>
+)}
+
+            {/* Analysis */}
+            {activeTab === 2 && (
+              <Box sx={{ mt: 3 }}>
+                <Card sx={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)' }}>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>Team Analysis</Typography>
+                    <Typography variant="body1">
+                      {teamStats.analysis || "No analysis available for this team."}
+                    </Typography>
+                  </CardContent>
+                </Card>
+                
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, mt: 3 }}>
+                  <StatCard title="Average Goals For" value={teamStats.avg_goals_for * 20} color="#00ff88" />
+                  <StatCard title="Average Goals Against" value={teamStats.avg_goals_against * 20} color="#ff4444" />
                 </Box>
               </Box>
-            </Box>
-
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 2 }}>
-              <StatCard title="Attack" value={teamStats.attack} color="#00ff88" />
-              <StatCard title="Defense" value={teamStats.defense} color="#00d4ff" />
-              <StatCard title="Midfield" value={teamStats.midfield} color="#ff6bff" />
-              <StatCard title="Overall" value={teamStats.overall} color="#ffaa00" />
-            </Box>
-          </CardContent>
-        </Card>
-
-        {/* Form Guide */}
-        <Card sx={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)' }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-              <TrendingUp sx={{ mr: 1 }} />
-              FORM GUIDE
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
-              {teamStats.form.map((result, index) => (
-                <FormIndicator key={index} result={result} />
-              ))}
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="body2">Goals For</Typography>
-              <Typography variant="body2" fontWeight="600" color="#00ff88">
-                {teamStats.goalsFor}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Typography variant="body2">Goals Against</Typography>
-              <Typography variant="body2" fontWeight="600" color="#ff4444">
-                {teamStats.goalsAgainst}
-              </Typography>
-            </Box>
-          </CardContent>
-        </Card>
-      </Box>
-
-      {/* Tabs for Detailed Analysis */}
-      <Paper sx={{ background: 'transparent' }}>
-        <Tabs
-          value={activeTab}
-          onChange={(_, newValue) => setActiveTab(newValue)}
-          sx={{
-            '& .MuiTab-root': { color: 'text.secondary', fontWeight: 600 },
-            '& .Mui-selected': { color: 'primary.main' }
-          }}
-        >
-          <Tab icon={<SportsSoccer />} label="Recent Matches" />
-          <Tab icon={<Schedule />} label="Upcoming Fixtures" />
-          <Tab icon={<Insights />} label="Advanced Stats" />
-        </Tabs>
-
-        {/* Recent Matches */}
-        {activeTab === 0 && (
-          <Box sx={{ mt: 3 }}>
-            {teamStats.last5Matches.map((match, index) => (
-              <Card key={index} sx={{ mb: 2, background: 'linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)' }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <FormIndicator result={match.result} />
-                      <Box>
-                        <Typography variant="body1" fontWeight="600">
-                          vs {match.opponent}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {match.home ? 'Home' : 'Away'} • {match.score}
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Chip 
-                      label={match.result === 'W' ? 'WIN' : match.result === 'D' ? 'DRAW' : 'LOSS'}
-                      color={match.result === 'W' ? 'success' : match.result === 'D' ? 'warning' : 'error'}
-                      size="small"
-                    />
-                  </Box>
-                </CardContent>
-              </Card>
-            ))}
-          </Box>
-        )}
-
-        {/* Upcoming Fixtures */}
-        {activeTab === 1 && (
-          <Box sx={{ mt: 3 }}>
-            {teamStats.upcomingMatches.map((match, index) => (
-              <Card key={index} sx={{ mb: 2, background: 'linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)' }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Avatar sx={{ width: 40, height: 40, bgcolor: 'primary.main' }}>
-                        {selectedTeam.crest}
-                      </Avatar>
-                      <Typography variant="h6" fontWeight="600">
-                        VS
-                      </Typography>
-                      <Avatar sx={{ width: 40, height: 40, bgcolor: 'secondary.main' }}>
-                        {findTeamByShortName(match.opponent)?.crest}
-                      </Avatar>
-                    </Box>
-                    <Box sx={{ textAlign: 'right' }}>
-                      <Typography variant="body1" fontWeight="600">
-                        {match.home ? 'Home' : 'Away'}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {new Date(match.date).toLocaleDateString()}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            ))}
-          </Box>
-        )}
-
-        {/* Advanced Stats */}
-        {activeTab === 2 && (
-          <Box sx={{ mt: 3 }}>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
-              <StatCard title="Expected Goals (xG)" value={32} color="#00ff88" />
-              <StatCard title="Expected Goals Against (xGA)" value={24} color="#ff4444" />
-              <StatCard title="Possession %" value={58} color="#00d4ff" />
-              <StatCard title="Shot Conversion" value={12} color="#ff6bff" />
-            </Box>
-          </Box>
-        )}
-      </Paper>
+            )}
+          </Paper>
+        </>
+      ) : (
+        <Alert severity="warning">
+          No statistics available for {selectedTeam.name}. This team may not be in the historical dataset.
+        </Alert>
+      )}
     </Box>
   );
 };
