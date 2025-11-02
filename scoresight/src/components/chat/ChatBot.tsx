@@ -9,10 +9,14 @@ import {
   Avatar,
   Paper,
   Chip,
-  CircularProgress
+  CircularProgress,
+  Fade,
+  Zoom
 } from '@mui/material';
+import './ChatBot.css';
 import { Send, SmartToy, Person, Psychology, AutoAwesome } from '@mui/icons-material';
 import { chatService, ChatMessage } from '../../services/chatService';
+import './ChatBot.css';
 
 const ChatBot: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -127,12 +131,17 @@ const ChatBot: React.FC = () => {
   };
 
   return (
-    <Card sx={{ 
+    <Card className="chat-card" sx={{ 
       height: '600px', 
       display: 'flex', 
       flexDirection: 'column',
       background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+      border: '1px solid rgba(255, 255, 255, 0.18)',
+      backdropFilter: 'blur(4px)',
+      WebkitBackdropFilter: 'blur(4px)',
+      borderRadius: '10px',
     }}>
       <CardContent sx={{ 
         flex: 1, 
@@ -149,24 +158,72 @@ const ChatBot: React.FC = () => {
           flexShrink: 0,
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          background: 'linear-gradient(to right, rgba(0,0,0,0.2), transparent)',
+          position: 'relative',
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '1px',
+            background: 'linear-gradient(to right, #00d4ff, transparent)',
+          }
         }}>
           <Box>
-            <Typography variant="h6" fontWeight="bold" color="#00d4ff">
+            <Typography variant="h6" fontWeight="bold" sx={{
+              background: 'linear-gradient(45deg, #00d4ff, #00ff88)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              fontFamily: "'Poppins', sans-serif",
+              letterSpacing: '0.5px'
+            }}>
               🎯 Scoresight AI Analyst
             </Typography>
-            <Typography variant="caption" color="rgba(255,255,255,0.7)">
-              Powered by ML Models & AI • 75% Prediction Accuracy
+            <Typography variant="caption" sx={{
+              color: 'rgba(255,255,255,0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Box component="span" sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                background: 'rgba(0,212,255,0.1)',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                border: '1px solid rgba(0,212,255,0.2)'
+              }}>
+                🤖 ML Models & AI
+              </Box>
+              <Box component="span" sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                background: 'rgba(0,255,136,0.1)',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                border: '1px solid rgba(0,255,136,0.2)'
+              }}>
+                75% Prediction Accuracy
+              </Box>
             </Typography>
           </Box>
           <Chip
+            className="clear-button"
             label="Clear Chat"
             size="small"
             onClick={clearChat}
             sx={{ 
               borderColor: '#ff6b6b', 
               color: '#ff6b6b',
-              '&:hover': { bgcolor: '#ff6b6b', color: 'black' }
+              background: 'rgba(255,107,107,0.1)',
+              transition: 'all 0.3s ease',
+              '&:hover': { 
+                bgcolor: 'rgba(255,107,107,0.2)', 
+                color: '#ff6b6b',
+                transform: 'scale(1.05)'
+              }
             }}
           />
         </Box>
@@ -206,47 +263,55 @@ const ChatBot: React.FC = () => {
           {/* Messages */}
           <Box sx={{ flex: 1 }}>
             {messages.map((message) => (
-              <Box
-                key={message.id}
-                sx={{
-                  display: 'flex',
-                  justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
-                  mb: 2
-                }}
-              >
-                <Box sx={{ 
-                  display: 'flex', 
-                  alignItems: 'flex-start', 
-                  gap: 1, 
-                  maxWidth: '90%',
-                  flexDirection: message.role === 'user' ? 'row-reverse' : 'row'
-                }}>
-                  <Avatar sx={{ 
-                    width: 32, 
-                    height: 32, 
-                    bgcolor: message.role === 'user' ? '#00d4ff' : getSourceColor(message.source),
-                    flexShrink: 0
+              <Fade in timeout={400} key={message.id}>
+                <Box
+                  className={`chat-message ${message.role === 'user' ? 'chat-message-user' : 'chat-message-assistant'}`}
+                  sx={{
+                    display: 'flex',
+                    justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
+                    mb: 2,
+                    animation: message.role === 'user' ? 'slideInRight 0.3s ease-out' : 'slideIn 0.3s ease-out'
+                  }}
+                >
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'flex-start', 
+                    gap: 1, 
+                    maxWidth: '90%',
+                    flexDirection: message.role === 'user' ? 'row-reverse' : 'row'
                   }}>
-                    {message.role === 'user' ? <Person /> : getSourceIcon(message.source)}
-                  </Avatar>
+                    <Avatar sx={{ 
+                      width: 32, 
+                      height: 32, 
+                      bgcolor: message.role === 'user' ? '#00d4ff' : getSourceColor(message.source),
+                      flexShrink: 0,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                      border: '2px solid rgba(255,255,255,0.1)',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'scale(1.1)',
+                      }
+                    }}>
+                      {message.role === 'user' ? <Person /> : getSourceIcon(message.source)}
+                    </Avatar>
                   
-                  <Paper sx={{ 
+                  <Paper className="message-bubble" sx={{ 
                     p: 1.5, 
-                    bgcolor: message.role === 'user' ? '#00d4ff' : 'rgba(41, 40, 40, 1)',
-                    border: message.role === 'assistant' ? `1px solid ${getSourceColor(message.source)}` : 'none',
+                    bgcolor: message.role === 'user' ? 'rgba(0,212,255,0.15)' : 'rgba(41, 40, 40, 0.8)',
+                    border: message.role === 'assistant' ? `1px solid ${getSourceColor(message.source)}` : '1px solid rgba(0,212,255,0.3)',
                     maxWidth: '100%',
                     wordBreak: 'break-word',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    backdropFilter: 'blur(10px)',
+                    borderRadius: '12px'
                   }}>
                     <Typography variant="body1" sx={{ 
-                      color: message.role === 'user' ? 'black' : 'white', 
+                      color: 'white', 
                       whiteSpace: 'pre-wrap',
                       lineHeight: 1.4
                     }}>
                       {message.content}
-                    </Typography>
-                    
-                    {message.role === 'assistant' && message.source && (
+                    </Typography>                    {message.role === 'assistant' && message.source && (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
                         <Typography variant="caption" sx={{ 
                           color: getSourceColor(message.source),
@@ -261,6 +326,7 @@ const ChatBot: React.FC = () => {
                   </Paper>
                 </Box>
               </Box>
+              </Fade>
             ))}
             
             {isLoading && (
@@ -334,9 +400,22 @@ const ChatBot: React.FC = () => {
                     borderColor: '#00d4ff',
                   },
                 },
+                '& .MuiInputBase-input': {
+                  color: 'white',
+                  '&::placeholder': {
+                    color: 'rgba(255,255,255,0.7)',
+                    opacity: 1,
+                  },
+                },
               }}
-              inputProps={{
-                style: { color: 'white' }
+              InputProps={{
+                style: { color: 'white' },
+                sx: {
+                  '& input::placeholder': {
+                    color: 'rgba(255,255,255,0.7)',
+                    opacity: 1,
+                  },
+                },
               }}
             />
             <IconButton 

@@ -1,0 +1,227 @@
+/* Optimized animations */
+@keyframes slideIn {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes gradientBG {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Message animations */
+.chat-message {
+  will-change: transform, opacity;
+  transform-origin: center;
+}
+
+.chat-message-user {
+  animation: slideInRight 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.chat-message-assistant {
+  animation: slideIn 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Interactive elements */
+.message-bubble {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backface-visibility: hidden;
+}
+
+.message-bubble:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+}
+
+/* UI element animations */
+.suggestion-chip {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, box-shadow;
+}
+
+.suggestion-chip:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 212, 255, 0.2);
+}
+
+.send-button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.send-button:hover {
+  transform: scale(1.1) rotate(10deg);
+}
+
+/* Loading state */
+.loading-dot {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+/* Card container */
+.chat-card {
+  animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  background-size: 200% 200%;
+  animation: gradientBG 15s ease infinite;
+  will-change: background-position;
+}
+
+/* Clear button */
+.clear-button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, box-shadow;
+}
+
+.clear-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+}
+@keyframes slideIn {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes gradientBG {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.chat-message {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.chat-message-user {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.chat-message-assistant {
+  animation: slideIn 0.3s ease-out;
+}
+
+.suggestion-chip {
+  transition: all 0.3s ease;
+}
+
+.suggestion-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 212, 255, 0.2);
+}
+
+.send-button {
+  transition: all 0.3s ease;
+}
+
+.send-button:hover {
+  transform: scale(1.1);
+}
+
+.loading-dot {
+  animation: pulse 1s infinite;
+}
+
+.chat-card {
+  animation: fadeIn 0.5s ease-out;
+  background-size: 200% 200%;
+  animation: gradientBG 15s ease infinite;
+}
+
+.clear-button {
+  transition: all 0.3s ease;
+}
+
+.clear-button:hover {
+  transform: scale(1.05);
+}

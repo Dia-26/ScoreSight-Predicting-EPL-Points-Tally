@@ -8,8 +8,16 @@ import {
   Chip,
   Avatar,
   LinearProgress,
-  Skeleton
+  Skeleton,
+  Paper,
+  IconButton,
+  Tooltip,
+  Zoom,
+  Fade,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
+import './Dashboard.css';
 import { 
   TrendingUp, 
   Schedule, 
@@ -18,12 +26,20 @@ import {
   Groups,
   EmojiEvents,
   LiveTv,
-  Chat
+  Chat,
+  InfoOutlined,
+  SportsSoccer,
+  Timeline,
+  Assessment,
+  BarChart,
+  Stars,
+  Refresh
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import liveDataService from '../services/liveDataService';
 import { footballAPI } from '../services/footballApi';
 import { Calculate } from '@mui/icons-material';
+// Remove the image imports and use team data from your API instead
 
 // Add these interfaces for our data
 interface Team {
@@ -57,6 +73,7 @@ interface Prediction {
 }
 
 const Dashboard: React.FC = () => {
+  const theme = useTheme();
   const navigate = useNavigate();
   const [liveMatches, setLiveMatches] = useState<LiveMatch[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -68,44 +85,45 @@ const Dashboard: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  const fetchLiveData = async () => {
+    setLoading(true);
+    try {
+      const fixtures = await liveDataService.getFixtures();
+      console.log('Fixtures from API:', fixtures);
+      
+      // Show first 4 matches regardless of date for testing
+      const upcomingMatches = fixtures.slice(0, 4);
+      setLiveMatches(upcomingMatches);
+
+      // Generate mock predictions based on real fixtures
+      const mockPredictions = upcomingMatches.map((match: LiveMatch, index: number) => ({
+        homeTeam: match.homeTeam,
+        awayTeam: match.awayTeam,
+        homeWinProbability: 0.4 + (index * 0.1), // Varying probabilities
+        drawProbability: 0.25,
+        awayWinProbability: 0.35 - (index * 0.1),
+        confidence: index === 0 ? 'high' : index === 1 ? 'medium' : 'low' as const,
+        predictedScore: index === 0 ? '2-1' : index === 1 ? '1-1' : '0-2',
+        keyFactors: [
+          'Home advantage significant',
+          'Recent form analysis',
+          'Head-to-head record favorable'
+        ],
+        betRecommendation: index === 0 ? 'HOME WIN' : undefined
+      }));
+
+      setPredictions(mockPredictions);
+    } catch (error) {
+      console.error('Error fetching live data:', error);
+      // Create fallback empty state instead of using mock data
+      setLiveMatches([]);
+      setPredictions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchLiveData = async () => {
-      try {
-        const fixtures = await liveDataService.getFixtures();
-        console.log('Fixtures from API:', fixtures);
-        
-        // Show first 4 matches regardless of date for testing
-        const upcomingMatches = fixtures.slice(0, 4);
-        setLiveMatches(upcomingMatches);
-
-        // Generate mock predictions based on real fixtures
-        const mockPredictions = upcomingMatches.map((match: LiveMatch, index: number) => ({
-          homeTeam: match.homeTeam,
-          awayTeam: match.awayTeam,
-          homeWinProbability: 0.4 + (index * 0.1), // Varying probabilities
-          drawProbability: 0.25,
-          awayWinProbability: 0.35 - (index * 0.1),
-          confidence: index === 0 ? 'high' : index === 1 ? 'medium' : 'low' as const,
-          predictedScore: index === 0 ? '2-1' : index === 1 ? '1-1' : '0-2',
-          keyFactors: [
-            'Home advantage significant',
-            'Recent form analysis',
-            'Head-to-head record favorable'
-          ],
-          betRecommendation: index === 0 ? 'HOME WIN' : undefined
-        }));
-
-        setPredictions(mockPredictions);
-      } catch (error) {
-        console.error('Error fetching live data:', error);
-        // Create fallback empty state instead of using mock data
-        setLiveMatches([]);
-        setPredictions([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchLiveData();
   }, []);
 
@@ -124,14 +142,24 @@ const Dashboard: React.FC = () => {
     return '#f44336';
   };
 
-  const StatsOverview: React.FC = () => (
+
+  const StatsOverview: React.FC = () => {
+    const theme = useTheme();
+    const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
+    const [animateStats, setAnimateStats] = useState(false);
+
+    useEffect(() => {
+      setAnimateStats(true);
+    }, []);
+
+    return (
     <Box sx={{ 
       display: 'grid', 
       gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(4, 1fr)' }, 
       gap: 3, 
       mb: 4 
     }}>
-      {/* Stats cards remain the same */}
+      {/* Stats cards */}
       <Card sx={{ 
         height: '100%', 
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -217,6 +245,7 @@ const Dashboard: React.FC = () => {
       </Card>
     </Box>
   );
+  };
 
   const MatchCard: React.FC<{ match: LiveMatch; prediction?: Prediction }> = ({ match, prediction }) => {
     // Use the provided prediction or create a basic fallback
@@ -233,6 +262,20 @@ const Dashboard: React.FC = () => {
     };
 
     return (
+      <Tooltip
+        title={
+          <Box sx={{ p: 1 }}>
+            <Typography variant="subtitle2">Predicted: {currentPrediction.predictedScore}</Typography>
+            <Typography variant="caption">H: {(currentPrediction.homeWinProbability * 100).toFixed(1)}% • D: {(currentPrediction.drawProbability * 100).toFixed(1)}% • A: {(currentPrediction.awayWinProbability * 100).toFixed(1)}%</Typography>
+            <Typography variant="caption" display="block">Confidence: {currentPrediction.confidence}</Typography>
+            <Typography variant="caption" display="block">{new Date(match.date).toLocaleString()}</Typography>
+          </Box>
+        }
+        placement="top"
+        arrow
+        enterDelay={150}
+        leaveDelay={100}
+      >
       <Card sx={{ 
         height: '100%',
         transition: 'all 0.3s ease-in-out',
@@ -241,13 +284,20 @@ const Dashboard: React.FC = () => {
           transform: 'translateY(-4px)',
           boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
         }
-      }}>  
+      }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
             <Box>
-              <Typography variant="h6" component="div" fontWeight="600">
-                {match.homeTeam.crest} {match.homeTeam.shortName} vs {match.awayTeam.crest} {match.awayTeam.shortName}
-              </Typography>
+              <Typography variant="h6" component="div" fontWeight="600" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Avatar src={match.homeTeam.crest || undefined} alt={match.homeTeam.shortName} sx={{ width: 28, height: 28 }}>
+                    {!match.homeTeam.crest && match.homeTeam.shortName?.charAt(0)}
+                  </Avatar>
+                  {match.homeTeam.shortName} vs 
+                  <Avatar src={match.awayTeam.crest || undefined} alt={match.awayTeam.shortName} sx={{ width: 28, height: 28 }}>
+                    {!match.awayTeam.crest && match.awayTeam.shortName?.charAt(0)}
+                  </Avatar>
+                  {match.awayTeam.shortName}
+                </Typography>
               <Typography color="text.secondary" variant="caption">
                 {new Date(match.date).toLocaleDateString('en-US', { 
                   weekday: 'short', 
@@ -269,8 +319,8 @@ const Dashboard: React.FC = () => {
           <Box sx={{ mb: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main', fontSize: 12 }}>
-                  {match.homeTeam.crest}
+                <Avatar src={match.homeTeam.crest || undefined} sx={{ width: 24, height: 24 }}>
+                  {!match.homeTeam.crest && match.homeTeam.shortName?.charAt(0)}
                 </Avatar>
                 <Typography variant="body2" fontWeight="600">{match.homeTeam.shortName}</Typography>
               </Box>
@@ -314,8 +364,8 @@ const Dashboard: React.FC = () => {
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Avatar sx={{ width: 24, height: 24, bgcolor: 'secondary.main', fontSize: 12 }}>
-                  {match.awayTeam.crest}
+                <Avatar src={match.awayTeam.crest || undefined} sx={{ width: 24, height: 24 }}>
+                  {!match.awayTeam.crest && match.awayTeam.shortName?.charAt(0)}
                 </Avatar>
                 <Typography variant="body2" fontWeight="600">{match.awayTeam.shortName}</Typography>
               </Box>
@@ -371,6 +421,7 @@ const Dashboard: React.FC = () => {
           </Box>
         </CardContent>
       </Card>
+      </Tooltip>
     );
   };
 
