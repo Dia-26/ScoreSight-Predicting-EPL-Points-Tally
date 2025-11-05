@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import requests
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import pickle
 import joblib
 import pandas as pd
@@ -186,6 +186,7 @@ class TeamAnalyzer:
     def __init__(self):
         self.historical_data = None
         self.teams_stats = {}
+        self.teams_form = {}
         self.load_historical_data()
 
     def get_all_trained_teams(self):
@@ -212,6 +213,7 @@ class TeamAnalyzer:
                 print(f"✅ Loaded historical data from: {historical_data_path}")
                 print(f"📊 Dataset shape: {self.historical_data.shape}")
                 self.calculate_team_stats()
+                self.calculate_team_form()
                 return
             except Exception as e:
                 print(f"❌ Error loading historical data: {e}")
@@ -276,6 +278,55 @@ class TeamAnalyzer:
             self.teams_stats[team] = self.calculate_single_team_stats(team)
         
         print(f"✅ Calculated stats for {len(self.teams_stats)} teams")
+    
+    def calculate_team_form(self):
+        """Calculate recent form for all teams (last 5 matches)"""
+        if self.historical_data is None:
+            return
+            
+        all_teams = set(self.historical_data['HomeTeam'].unique()) | set(self.historical_data['AwayTeam'].unique())
+        
+        for team in all_teams:
+            self.teams_form[team] = self.calculate_recent_form(team)
+        
+        print(f"✅ Calculated form for {len(self.teams_form)} teams")
+    
+    def calculate_recent_form(self, team_name: str, num_matches: int = 5) -> Dict[str, Any]:
+        """Calculate recent form for a team"""
+        recent_matches = self.get_recent_matches(team_name, num_matches)
+        
+        if not recent_matches:
+            return {
+                'form_points': 0,
+                'avg_points': 0,
+                'goals_for_avg': 0,
+                'goals_against_avg': 0,
+                'clean_sheets': 0
+            }
+        
+        # Calculate form points
+        form_points = 0
+        goals_for = 0
+        goals_against = 0
+        clean_sheets = 0
+        
+        for match in recent_matches:
+            if match['result'] == 'W':
+                form_points += 3
+            elif match['result'] == 'D':
+                form_points += 1
+            goals_for += match['goals_for']
+            goals_against += match['goals_against']
+            if match['goals_against'] == 0:
+                clean_sheets += 1
+        
+        return {
+            'form_points': form_points,
+            'avg_points': form_points / len(recent_matches),
+            'goals_for_avg': goals_for / len(recent_matches),
+            'goals_against_avg': goals_against / len(recent_matches),
+            'clean_sheets': clean_sheets
+        }
     
     def calculate_single_team_stats(self, team_name: str) -> Dict[str, Any]:
         """Calculate statistics for a single team"""
@@ -700,7 +751,7 @@ def convert_numpy_types(obj):
         return obj
 
 def create_pre_match_features(home_team, away_team):
-    """Create feature vector for pre-match prediction"""
+    """Create feature vector for pre-match prediction using real historical data"""
     preprocessing = ml_models['pre_match_preprocessing']
     feature_columns = preprocessing['feature_columns']
     
@@ -711,23 +762,45 @@ def create_pre_match_features(home_team, away_team):
     features['HomeTeam'] = home_team
     features['AwayTeam'] = away_team
     
-    # Default values for prediction
-    features['Home_Form_5'] = 1.5
-    features['Away_Form_5'] = 1.5
-    features['Home_Goals_Avg_5'] = 1.4
-    features['Away_Goals_Avg_5'] = 1.2
-    features['Home_Defense_Avg_5'] = 1.2
-    features['Away_Defense_Avg_5'] = 1.4
-    features['Avg_H_Odds'] = 2.1
+    # Get real team statistics from historical data
+    home_stats = team_analyzer.teams_stats.get(home_team, {})
+    away_stats = team_analyzer.teams_stats.get(away_team, {})
+    home_form = team_analyzer.teams_form.get(home_team, {})
+    away_form = team_analyzer.teams_form.get(away_team, {})
+    
+    # Get head-to-head statistics
+    h2h = team_analyzer.get_head_to_head(home_team, away_team)
+    
+    # Use real historical data instead of hardcoded values
+    features['Home_Form_5'] = home_form.get('avg_points', 1.5)
+    features['Away_Form_5'] = away_form.get('avg_points', 1.5)
+    features['Home_Goals_Avg_5'] = home_form.get('goals_for_avg', 1.4)
+    features['Away_Goals_Avg_5'] = away_form.get('goals_for_avg', 1.2)
+    features['Home_Defense_Avg_5'] = home_form.get('goals_against_avg', 1.2)
+    features['Away_Defense_Avg_5'] = away_form.get('goals_against_avg', 1.4)
+    
+    # Calculate betting odds based on team strength
+    home_strength = home_stats.get('overall_strength', 70)
+    away_strength = away_stats.get('overall_strength', 70)
+    
+    # Realistic odds calculation based on team strength
+    strength_diff = home_strength - away_strength
+    features['Avg_H_Odds'] = max(1.5, 3.0 - (strength_diff / 50))
     features['Avg_D_Odds'] = 3.4
-    features['Avg_A_Odds'] = 3.8
-    features['Home_Win_Probability'] = 0.42
-    features['Draw_Probability'] = 0.27
-    features['Away_Win_Probability'] = 0.31
-    features['H2H_Home_Wins'] = 3.0
-    features['H2H_Away_Wins'] = 2.0
+    features['Avg_A_Odds'] = max(1.5, 3.0 + (strength_diff / 50))
+    
+    # Calculate probabilities from odds
+    features['Home_Win_Probability'] = 1 / features['Avg_H_Odds']
+    features['Draw_Probability'] = 1 / features['Avg_D_Odds']
+    features['Away_Win_Probability'] = 1 / features['Avg_A_Odds']
+    
+    # Real head-to-head data
+    features['H2H_Home_Wins'] = h2h.get('team1_wins', 3.0) if h2h.get('total_matches', 0) > 0 else 3.0
+    features['H2H_Away_Wins'] = h2h.get('team2_wins', 2.0) if h2h.get('total_matches', 0) > 0 else 2.0
+    
+    # Season progress (default to mid-season)
     features['Season_Progress'] = 0.5
-    features['Referee'] = 'M Dean'
+    features['Referee'] = 'M Dean'  # Default referee
     
     return features, feature_columns
 
@@ -768,34 +841,52 @@ def create_detailed_features(home_team, away_team, match_stats):
     features['Home_Shots_Accuracy'] = features['HST'] / features['HS'] if features['HS'] > 0 else 0
     features['Away_Shots_Accuracy'] = features['AST'] / features['AS'] if features['AS'] > 0 else 0
     
-    # Team-specific features
-    team_variation_factor = (hash(home_team + away_team) % 100) / 100
+    # Get real team form and statistics
+    home_stats = team_analyzer.teams_stats.get(home_team, {})
+    away_stats = team_analyzer.teams_stats.get(away_team, {})
+    home_form = team_analyzer.teams_form.get(home_team, {})
+    away_form = team_analyzer.teams_form.get(away_team, {})
+    h2h = team_analyzer.get_head_to_head(home_team, away_team)
     
-    features['Home_Form_5'] = 1.5 + (team_variation_factor * 0.5)
-    features['Away_Form_5'] = 1.5 + ((1 - team_variation_factor) * 0.5)
-    features['Home_Goals_Avg_5'] = 1.4 + (team_variation_factor * 0.3) + (features['FTHG'] / 10)
-    features['Away_Goals_Avg_5'] = 1.2 + ((1 - team_variation_factor) * 0.3) + (features['FTAG'] / 10)
-    features['Home_Defense_Avg_5'] = 1.2 - (team_variation_factor * 0.2) - (features['FTAG'] / 10)
-    features['Away_Defense_Avg_5'] = 1.4 - ((1 - team_variation_factor) * 0.2) - (features['FTHG'] / 10)
+    # Use real historical data combined with current match stats
+    features['Home_Form_5'] = home_form.get('avg_points', 1.5)
+    features['Away_Form_5'] = away_form.get('avg_points', 1.5)
+    features['Home_Goals_Avg_5'] = home_form.get('goals_for_avg', 1.4)
+    features['Away_Goals_Avg_5'] = away_form.get('goals_for_avg', 1.2)
+    features['Home_Defense_Avg_5'] = home_form.get('goals_against_avg', 1.2)
+    features['Away_Defense_Avg_5'] = away_form.get('goals_against_avg', 1.4)
     
-    # Betting odds
-    features['Avg_H_Odds'] = 2.1 + (team_variation_factor * 0.5)
-    features['Avg_D_Odds'] = 3.4 - (team_variation_factor * 0.3)
-    features['Avg_A_Odds'] = 3.8 - (team_variation_factor * 0.5)
-    features['Home_Win_Probability'] = 0.42 + (team_variation_factor * 0.1)
-    features['Draw_Probability'] = 0.27 - (team_variation_factor * 0.05)
-    features['Away_Win_Probability'] = 0.31 - (team_variation_factor * 0.05)
+    # Calculate betting odds based on current performance and historical strength
+    home_strength = home_stats.get('overall_strength', 70)
+    away_strength = away_stats.get('overall_strength', 70)
     
-    # Head-to-head and season data
-    features['H2H_Home_Wins'] = 3.0 + (team_variation_factor * 2)
-    features['H2H_Away_Wins'] = 2.0 + ((1 - team_variation_factor) * 2)
+    # Adjust odds based on current match performance
+    current_home_advantage = 1.0
+    if features['FTHG'] > features['FTAG']:
+        current_home_advantage = 0.8  # Home team leading
+    elif features['FTAG'] > features['FTHG']:
+        current_home_advantage = 1.2  # Away team leading
+    
+    strength_diff = (home_strength - away_strength) * current_home_advantage
+    features['Avg_H_Odds'] = max(1.5, 3.0 - (strength_diff / 50))
+    features['Avg_D_Odds'] = 3.4
+    features['Avg_A_Odds'] = max(1.5, 3.0 + (strength_diff / 50))
+    
+    features['Home_Win_Probability'] = 1 / features['Avg_H_Odds']
+    features['Draw_Probability'] = 1 / features['Avg_D_Odds']
+    features['Away_Win_Probability'] = 1 / features['Avg_A_Odds']
+    
+    # Real head-to-head data
+    features['H2H_Home_Wins'] = h2h.get('team1_wins', 3.0) if h2h.get('total_matches', 0) > 0 else 3.0
+    features['H2H_Away_Wins'] = h2h.get('team2_wins', 2.0) if h2h.get('total_matches', 0) > 0 else 2.0
+    
     features['Season_Progress'] = 0.5
     features['Referee'] = 'M Dean'
     
     return features, feature_columns
 
-def create_half_time_features(home_team, away_team, home_score, away_score):
-    """Create feature vector for half-time prediction"""
+def create_half_time_features(home_team, away_team, home_score, away_score, match_stats=None):
+    """Create feature vector for half-time prediction using real-time data"""
     preprocessing = ml_models['half_time_preprocessing']
     feature_columns = preprocessing['feature_columns']
     
@@ -820,19 +911,42 @@ def create_half_time_features(home_team, away_team, home_score, away_score):
         
     features['HT_Goal_Difference'] = home_score - away_score
     
-    # Set realistic half-time statistics
-    features['HS'] = 6.0
-    features['AS'] = 5.0
-    features['HST'] = 2.5
-    features['AST'] = 2.0
-    features['HC'] = 3.0
-    features['AC'] = 2.0
-    features['HF'] = 7.0
-    features['AF'] = 8.0
-    features['HY'] = 1.0
-    features['AY'] = 1.0
-    features['HR'] = 0.0
-    features['AR'] = 0.0
+    # Use real-time statistics if provided, otherwise use realistic estimates
+    if match_stats:
+        # Use actual match statistics
+        features['HS'] = match_stats.get('hs', 0)
+        features['AS'] = match_stats.get('as', 0)
+        features['HST'] = match_stats.get('hst', 0)
+        features['AST'] = match_stats.get('ast', 0)
+        features['HC'] = match_stats.get('hc', 0)
+        features['AC'] = match_stats.get('ac', 0)
+        features['HF'] = match_stats.get('hf', 0)
+        features['AF'] = match_stats.get('af', 0)
+        features['HY'] = match_stats.get('hy', 0)
+        features['AY'] = match_stats.get('ay', 0)
+        features['HR'] = match_stats.get('hr', 0)
+        features['AR'] = match_stats.get('ar', 0)
+    else:
+        # Realistic estimates based on score and team strength
+        home_stats = team_analyzer.teams_stats.get(home_team, {})
+        away_stats = team_analyzer.teams_stats.get(away_team, {})
+        
+        base_shots = 5.0
+        home_attack = home_stats.get('attack_strength', 70) / 100
+        away_attack = away_stats.get('attack_strength', 70) / 100
+        
+        features['HS'] = base_shots + (home_attack * 3)
+        features['AS'] = base_shots + (away_attack * 3)
+        features['HST'] = max(1, home_score + (features['HS'] * 0.3))
+        features['AST'] = max(1, away_score + (features['AS'] * 0.3))
+        features['HC'] = max(1, features['HS'] * 0.5)
+        features['AC'] = max(1, features['AS'] * 0.5)
+        features['HF'] = 7.0
+        features['AF'] = 8.0
+        features['HY'] = 1.0
+        features['AY'] = 1.0
+        features['HR'] = 0.0
+        features['AR'] = 0.0
     
     # Derived features
     features['Total_Shots_HT'] = features['HS'] + features['AS']
@@ -1439,9 +1553,9 @@ async def predict_detailed_match(match_data: dict):
             "model_loaded": ml_models is not None
         }
 
-@app.get("/api/half-time-predict")
-async def half_time_predict(home_team: str, away_team: str, home_score: int = 0, away_score: int = 0):
-    """Half-time prediction using your 65% accurate ML model"""
+@app.post("/api/half-time-predict")
+async def half_time_predict(half_time_data: dict):
+    """Half-time prediction using your 65% accurate ML model with real-time data"""
     try:
         if ml_models is None:
             return {
@@ -1449,13 +1563,26 @@ async def half_time_predict(home_team: str, away_team: str, home_score: int = 0,
                 "model_loaded": False
             }
         
+        # Extract data from request
+        home_team = half_time_data.get('home_team', '')
+        away_team = half_time_data.get('away_team', '')
+        home_score = half_time_data.get('home_score', 0)
+        away_score = half_time_data.get('away_score', 0)
+        match_stats = half_time_data.get('match_stats', {})
+        
+        if not home_team or not away_team:
+            return {
+                "error": "Both home_team and away_team are required",
+                "model_loaded": True
+            }
+
         # Map team names to your model's format
         home_team_mapped = enhanced_map_team_name(home_team)
         away_team_mapped = enhanced_map_team_name(away_team)
         
-        # Create features for half-time prediction
+        # Create features for half-time prediction with real-time data
         features, feature_columns = create_half_time_features(
-            home_team_mapped, away_team_mapped, home_score, away_score
+            home_team_mapped, away_team_mapped, home_score, away_score, match_stats
         )
         
         # Preprocess features
@@ -1480,23 +1607,64 @@ async def half_time_predict(home_team: str, away_team: str, home_score: int = 0,
         max_prob = max(home_win_prob, draw_prob, away_win_prob)
         confidence = "high" if max_prob > 0.6 else "medium" if max_prob > 0.45 else "low"
         
-        # Predict final score based on current score and probabilities
+        # Predict final score based on current score, probabilities, and match statistics
+        home_shots = match_stats.get('hs', features['HS'])
+        away_shots = match_stats.get('as', features['AS'])
+        home_shots_on_target = match_stats.get('hst', features['HST'])
+        away_shots_on_target = match_stats.get('ast', features['AST'])
+        
+        # Calculate expected second half goals based on current performance
+        home_expected_additional = (home_shots_on_target * 0.15) + (0.5 if home_win_prob > 0.5 else 0)
+        away_expected_additional = (away_shots_on_target * 0.15) + (0.5 if away_win_prob > 0.5 else 0)
+        
+        home_final = home_score + max(0, round(home_expected_additional))
+        away_final = away_score + max(0, round(away_expected_additional))
+        
+        # Ensure at least one goal if someone is heavily favored
+        if home_final == home_score and away_final == away_score and max_prob > 0.6:
+            if home_win_prob > away_win_prob:
+                home_final += 1
+            else:
+                away_final += 1
+        
         if home_win_prob > away_win_prob and home_win_prob > draw_prob:
             predicted_outcome = "HOME"
-            home_final = home_score + 1
-            away_final = away_score
         elif away_win_prob > home_win_prob and away_win_prob > draw_prob:
             predicted_outcome = "AWAY"
-            home_final = home_score  
-            away_final = away_score + 1
         else:
             predicted_outcome = "DRAW"
-            home_final = home_score
-            away_final = away_score
-            
-        if predicted_outcome == "DRAW" and home_final == 0 and away_final == 0:
-            home_final, away_final = 1, 1
+
+        # Generate dynamic key factors for half-time
+        key_factors = []
         
+        if home_score > away_score:
+            key_factors.append(f"Home team leading {home_score}-{away_score}")
+        elif away_score > home_score:
+            key_factors.append(f"Away team leading {away_score}-{home_score}")
+        else:
+            key_factors.append("Match is currently level")
+            
+        if home_shots > away_shots + 2:
+            key_factors.append(f"Home team dominating possession ({home_shots} shots)")
+        elif away_shots > home_shots + 2:
+            key_factors.append(f"Away team dominating possession ({away_shots} shots)")
+            
+        home_accuracy = home_shots_on_target / home_shots if home_shots > 0 else 0
+        away_accuracy = away_shots_on_target / away_shots if away_shots > 0 else 0
+        
+        if home_accuracy > 0.5:
+            key_factors.append("Home team shooting accurately")
+        if away_accuracy > 0.5:
+            key_factors.append("Away team shooting accurately")
+            
+        # Add historical factors
+        h2h = team_analyzer.get_head_to_head(home_team, away_team)
+        if h2h.get('total_matches', 0) > 0:
+            if h2h['team1_win_percentage'] > 60:
+                key_factors.append("Strong historical advantage for home team")
+            elif h2h['team2_win_percentage'] > 60:
+                key_factors.append("Strong historical advantage for away team")
+
         return {
             "home_team": home_team,
             "away_team": away_team,
@@ -1509,12 +1677,7 @@ async def half_time_predict(home_team: str, away_team: str, home_score: int = 0,
             "momentum": "home" if home_score > away_score else "away" if away_score > home_score else "equal",
             "comebackLikelihood": "high" if (away_score > home_score and home_win_prob > away_win_prob) or 
                                         (home_score > away_score and away_win_prob > home_win_prob) else "medium",
-            "keyFactors": [
-                "Current score advantage",
-                "Team form analysis", 
-                "Head-to-head record",
-                "Home advantage significance"
-            ],
+            "keyFactors": key_factors,
             "aiExplanation": f"Based on first-half performance and machine learning analysis, {predicted_outcome.lower()} team has {max_prob*100:.1f}% chance to win.",
             "model_used": "Real ML Model (65% accuracy)",
             "model_loaded": True,

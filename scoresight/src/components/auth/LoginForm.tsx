@@ -101,7 +101,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
         SCORESIGHT
       </Typography>
       <Typography variant="h6" gutterBottom sx={{ color: '#b0bec5', mb: 3 }}>
-        Welcome Back to the Prediction Master! 🎯
+        Welcome Back! 🎯
       </Typography>
 
       {error && (

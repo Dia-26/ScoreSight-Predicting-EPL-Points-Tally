@@ -58,14 +58,18 @@ const PreMatchPrediction: React.FC = () => {
     fetchTeams();
   }, []);
 
+  // Find selected team objects
+  const selectedHomeTeam = teams.find(team => team.id === parseInt(homeTeam));
+  const selectedAwayTeam = teams.find(team => team.id === parseInt(awayTeam));
+
   const handlePredict = async () => {
     if (!homeTeam || !awayTeam) return;
     
     setLoading(true);
     try {
       // Get team names from IDs
-      const homeTeamObj = findTeamById(homeTeam);
-      const awayTeamObj = findTeamById(awayTeam);
+      const homeTeamObj = selectedHomeTeam;
+      const awayTeamObj = selectedAwayTeam;
       
       if (!homeTeamObj || !awayTeamObj) {
         throw new Error('Team not found');
@@ -125,9 +129,6 @@ const PreMatchPrediction: React.FC = () => {
     }
   };
 
-  // Helper function to find team by ID
-  const findTeamById = (id: string) => teams.find(team => team.id === parseInt(id));
-
   const PredictionResult: React.FC = () => (
     <Card sx={{ mt: 4, background: 'linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)' }}>
       <CardContent>
@@ -141,15 +142,27 @@ const PreMatchPrediction: React.FC = () => {
         {/* Teams and Score */}
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, mb: 2 }}>
+            {/* Home Team */}
             <Box sx={{ textAlign: 'center' }}>
-              <Avatar sx={{ width: 80, height: 80, bgcolor: 'primary.main', mx: 'auto', mb: 1 }}>
-                {findTeamById(homeTeam)?.crest}
+              <Avatar 
+                src={selectedHomeTeam?.crest}
+                sx={{ 
+                  width: 80, 
+                  height: 80, 
+                  bgcolor: 'primary.main', 
+                  mx: 'auto', 
+                  mb: 1,
+                  border: '3px solid #00d4ff'
+                }}
+              >
+                {selectedHomeTeam?.crest ? '' : selectedHomeTeam?.shortName?.charAt(0)}
               </Avatar>
               <Typography variant="h6" fontWeight="600">
-                {findTeamById(homeTeam)?.shortName}
+                {selectedHomeTeam?.shortName}
               </Typography>
             </Box>
             
+            {/* Score */}
             <Box>
               <Typography variant="h3" fontWeight="800" color="primary">
                 {prediction.predicted_score || prediction.predictedScore}
@@ -161,12 +174,23 @@ const PreMatchPrediction: React.FC = () => {
               />
             </Box>
 
+            {/* Away Team */}
             <Box sx={{ textAlign: 'center' }}>
-              <Avatar sx={{ width: 80, height: 80, bgcolor: 'secondary.main', mx: 'auto', mb: 1 }}>
-                {findTeamById(awayTeam)?.crest}
+              <Avatar 
+                src={selectedAwayTeam?.crest}
+                sx={{ 
+                  width: 80, 
+                  height: 80, 
+                  bgcolor: 'secondary.main', 
+                  mx: 'auto', 
+                  mb: 1,
+                  border: '3px solid #ff6bff'
+                }}
+              >
+                {selectedAwayTeam?.crest ? '' : selectedAwayTeam?.shortName?.charAt(0)}
               </Avatar>
               <Typography variant="h6" fontWeight="600">
-                {findTeamById(awayTeam)?.shortName}
+                {selectedAwayTeam?.shortName}
               </Typography>
             </Box>
           </Box>
@@ -317,11 +341,25 @@ const PreMatchPrediction: React.FC = () => {
                 ) : (
                   teams.map((team) => (
                     <MenuItem key={team.id} value={team.id}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar sx={{ width: 24, height: 24, mr: 2, bgcolor: 'primary.main' }}>
-                          {team.crest}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Avatar 
+                          src={team.crest}
+                          sx={{ 
+                            width: 32, 
+                            height: 32, 
+                            bgcolor: 'primary.main'
+                          }}
+                        >
+                          {team.shortName?.charAt(0)}
                         </Avatar>
-                        {team.name}
+                        <Box>
+                          <Typography variant="body1" fontWeight="600">
+                            {team.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {team.shortName}
+                          </Typography>
+                        </Box>
                       </Box>
                     </MenuItem>
                   ))
@@ -352,11 +390,25 @@ const PreMatchPrediction: React.FC = () => {
                 ) : (
                   teams.map((team) => (
                     <MenuItem key={team.id} value={team.id}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar sx={{ width: 24, height: 24, mr: 2, bgcolor: 'secondary.main' }}>
-                          {team.crest}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Avatar 
+                          src={team.crest}
+                          sx={{ 
+                            width: 32, 
+                            height: 32, 
+                            bgcolor: 'secondary.main'
+                          }}
+                        >
+                          {team.shortName?.charAt(0)}
                         </Avatar>
-                        {team.name}
+                        <Box>
+                          <Typography variant="body1" fontWeight="600">
+                            {team.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {team.shortName}
+                          </Typography>
+                        </Box>
                       </Box>
                     </MenuItem>
                   ))

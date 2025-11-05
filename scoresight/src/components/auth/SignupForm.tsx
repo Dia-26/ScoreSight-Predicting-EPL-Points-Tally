@@ -105,7 +105,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onToggleMode }) => {
           left: -30,
           width: 80,
           height: 80,
-          background: 'radial-gradient(circle, #00ff88 0%, transparent 70%)',
+          background: 'radial-gradient(circle, #334d6e 0%, transparent 70%)',
           opacity: 0.1,
           animation: 'pulse 3s infinite'
         }}
