@@ -5,7 +5,9 @@ import {
   Typography, 
   Container,
   Box,
-  Button
+  Button,
+  Chip,
+  Avatar
 } from '@mui/material';
 import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
 import { Logout } from '@mui/icons-material';
@@ -22,12 +24,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { logout, user } = useAuth();
 
   const navItems = [
-    { label: 'Dashboard', path: '/' },
-    { label: 'AI Predictions', path: '/predictions/pre-match' },
-    { label: 'Team Analysis', path: '/team-analysis' },
-    { label: 'News & Blogs', path: '/news' }, // ← ADD THIS LINE
-    { label: 'AI Analyst', path: '/chat' },
-    { label: 'Half-Time Predictions', path: '/predictions/half-time' }
+    { label: 'Home', path: '/' },
+    { label: 'Predict', path: '/predictions/pre-match' },
+    { label: 'Teams', path: '/team-analysis' },
+    { label: 'News', path: '/news' },
+    { label: 'Analyst', path: '/chat' },
+    { label: 'Half-Time', path: '/predictions/half-time' }
   ];
 
   const handleLogout = () => {
@@ -82,11 +84,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           {/* User welcome and logout button */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, ml: 2 }}>
-            {user && (
-              <Typography variant="body2" sx={{ color: '#b0bec5', display: { xs: 'none', sm: 'block' } }}>
-                Welcome, {user.firstName}
-              </Typography>
-            )}
+            {/* Removed top-bar welcome text to free horizontal space */}
             <Button
               color="inherit"
               onClick={handleLogout}
@@ -107,6 +105,34 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </AppBar>
       
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+        {user && (
+          <Box
+            sx={{
+              mb: 3,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 1.5,
+              px: 2.2,
+              py: 1.2,
+              borderRadius: 999,
+              background: 'linear-gradient(90deg, rgba(0,212,255,0.18) 0%, rgba(255,107,255,0.18) 100%)',
+              border: '1px solid rgba(255,255,255,0.16)',
+              boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
+              transition: 'transform .2s ease, box-shadow .2s ease',
+              '&:hover': { transform: 'translateY(-1px)', boxShadow: '0 10px 28px rgba(0,0,0,0.2)' }
+            }}
+          >
+            <Avatar sx={{ bgcolor: '#00d4ff', color: '#0b0b0b', fontWeight: 800, width: 34, height: 34, fontSize: '0.95rem' }}>
+              {user.firstName?.[0]?.toUpperCase() || 'U'}
+            </Avatar>
+            <Typography
+              variant="h6"
+              sx={{ m: 0, p: 0, fontWeight: 800, letterSpacing: 0.2 }}
+            >
+              {`Welcome, ${user.firstName}`}
+            </Typography>
+          </Box>
+        )}
         {children}
       </Container>
     </Box>
