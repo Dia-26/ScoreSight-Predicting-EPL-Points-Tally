@@ -2,6 +2,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import requests
 import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 import pickle
 import joblib
@@ -752,6 +755,82 @@ def convert_numpy_types(obj):
         return [convert_numpy_types(item) for item in obj]
     else:
         return obj
+
+
+def send_email_via_smtp(to_email: str, subject: str, html_body: str) -> None:
+    """Send an HTML email using SMTP. Reads SMTP settings from environment variables.
+
+    Environment variables expected:
+    - SMTP_HOST
+    - SMTP_PORT
+    - SMTP_USER
+    - SMTP_PASS
+    - FROM_EMAIL (optional, defaults to SMTP_USER)
+    """
+    smtp_host = os.getenv('SMTP_HOST')
+    smtp_port = int(os.getenv('SMTP_PORT', '587'))
+    smtp_user = os.getenv('SMTP_USER')
+    smtp_pass = os.getenv('SMTP_PASS')
+    from_email = os.getenv('FROM_EMAIL') or smtp_user
+
+    if not smtp_host or not smtp_user or not smtp_pass:
+        raise RuntimeError('SMTP configuration incomplete. Set SMTP_HOST, SMTP_USER and SMTP_PASS in environment.')
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = from_email
+    msg['To'] = to_email
+
+    part = MIMEText(html_body, 'html')
+    msg.attach(part)
+
+    # Send using TLS
+    server = smtplib.SMTP(smtp_host, smtp_port)
+    try:
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.sendmail(from_email, [to_email], msg.as_string())
+    finally:
+        server.quit()
+
+
+def save_email_to_file(to_email: str, subject: str, html_body: str) -> str:
+    """Save the HTML email to a local file for development/testing.
+
+    Returns the path to the saved file.
+    """
+    emails_dir = os.path.join(BASE_DIR, 'emails')
+    os.makedirs(emails_dir, exist_ok=True)
+    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    safe_email = to_email.replace('@', '_at_').replace('.', '_')
+    filename = f"email_{safe_email}_{timestamp}.html"
+    path = os.path.join(emails_dir, filename)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(f"<!-- Subject: {subject} -->\n")
+        f.write(html_body)
+    print(f"✅ Email saved to file (SMTP not configured): {path}")
+    return path
+
+
+def send_or_save_email(to_email: str, subject: str, html_body: str) -> dict:
+    """Send via SMTP if configured, otherwise save the email to a local file.
+
+    Returns a dict with keys: success (bool), message (str), saved_path (optional).
+    """
+    smtp_host = os.getenv('SMTP_HOST')
+    smtp_user = os.getenv('SMTP_USER')
+    smtp_pass = os.getenv('SMTP_PASS')
+    try:
+        if smtp_host and smtp_user and smtp_pass:
+            send_email_via_smtp(to_email, subject, html_body)
+            return {'success': True, 'message': f'Email sent to {to_email}'}
+        else:
+            # Save to file for development convenience
+            path = save_email_to_file(to_email, subject, html_body)
+            return {'success': True, 'message': f'Email saved to {path}', 'saved_path': path}
+    except Exception as e:
+        print(f"Email send/save error: {e}")
+        return {'success': False, 'error': str(e)}
 
 def create_pre_match_features(home_team, away_team):
     """Create feature vector for pre-match prediction using real historical data"""
@@ -2065,6 +2144,166 @@ async def get_epl_news(limit: int = 10):
             "error": str(e),
             "data": []
         }
+
+
+@app.post('/api/send-prediction-email')
+async def send_prediction_email(payload: dict):
+    """Accepts a payload with email, inputs and prediction and sends an HTML report to the user.
+
+    Expected JSON body:
+    {
+      "email": "user@example.com",
+      "inputs": { ... },
+      "prediction": { ... },
+      "subject": "Optional subject string"
+    }
+    """
+    try:
+        email = payload.get('email')
+        inputs = payload.get('inputs', {})
+        prediction = payload.get('prediction', {})
+        subject = payload.get('subject') or 'Your Scoresight Prediction Report'
+
+        if not email:
+            raise HTTPException(status_code=400, detail='email is required')
+
+        # Build a simple HTML report
+        home = prediction.get('home_team') or inputs.get('home_team') or ''
+        away = prediction.get('away_team') or inputs.get('away_team') or ''
+        score = prediction.get('predicted_score') or prediction.get('finalScore') or ''
+        # Build a richer HTML report with inline styles for email clients
+        home_win = prediction.get('home_win_prob') or prediction.get('homeWinProbability') or 0
+        draw = prediction.get('draw_prob') or prediction.get('drawProbability') or 0
+        away_win = prediction.get('away_win_prob') or prediction.get('awayWinProbability') or 0
+
+        # Convert to percentages for bars
+        try:
+            home_pct = int(float(home_win) * 100)
+        except:
+            home_pct = 0
+        try:
+            draw_pct = int(float(draw) * 100)
+        except:
+            draw_pct = 0
+        try:
+            away_pct = int(float(away_win) * 100)
+        except:
+            away_pct = 0
+
+        # Determine confidence: prefer provided value, otherwise derive from probabilities
+        confidence = prediction.get('confidence') if isinstance(prediction, dict) else None
+        if not confidence:
+            try:
+                max_prob = max(float(home_win or 0), float(draw or 0), float(away_win or 0))
+                confidence = 'high' if max_prob > 0.6 else 'medium' if max_prob > 0.45 else 'low'
+            except Exception:
+                confidence = 'N/A'
+
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        html = f"""
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f4f6fb; margin:0; padding:20px; color:#1b1f23;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+            <td align="center">
+                <table width="700" cellpadding="0" cellspacing="0" role="presentation" style="background:linear-gradient(180deg,#0f1724 0%, #1b2430 100%); border-radius:12px; overflow:hidden; box-shadow:0 8px 30px rgba(16,24,40,0.2);">
+                    <tr>
+                        <td style="padding:24px 32px; color:#fff;">
+                            <h1 style="margin:0; font-size:22px; letter-spacing:0.4px;">Scoresight — Prediction Report</h1>
+                            <p style="margin:6px 0 0; color:rgba(255,255,255,0.85);">Generated: {timestamp}</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:22px 32px; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));">
+                            <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                                <tr>
+                                    <td style="width:45%; vertical-align:top; padding-right:16px;">
+                                        <div style="background:#0b1220; border-radius:8px; padding:16px; color:#fff; text-align:center;">
+                                            <div style="font-size:14px; opacity:0.9;">Match</div>
+                                            <div style="font-weight:700; font-size:18px; margin-top:8px;">{home} <span style="opacity:0.6; font-weight:600;">vs</span> {away}</div>
+                                            <div style="margin-top:12px; font-size:32px; font-weight:800; color:#00ffd6;">{score or 'N/A'}</div>
+                                            <div style="margin-top:8px; font-size:13px; color:rgba(255,255,255,0.8);">Confidence: {confidence or 'N/A'}</div>
+                                        </div>
+                                    </td>
+                                    <td style="width:55%; vertical-align:top;">
+                                        <div style="background:#071024; border-radius:8px; padding:12px; color:#fff;">
+                                            <div style="font-size:14px; opacity:0.9; margin-bottom:8px;">Win Probabilities</div>
+                                            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                                                <div style="flex:1;">
+                                                    <div style="font-size:12px; color:#9fb3c8;">Home Win <span style="float:right;">{home_pct}%</span></div>
+                                                    <div style="background:#0b1220; height:10px; border-radius:6px; overflow:hidden; margin-top:6px;"><div style="width:{home_pct}%; height:100%; background:linear-gradient(90deg,#00d4ff,#0066ff);"></div></div>
+                                                </div>
+                                            </div>
+                                            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                                                <div style="flex:1;">
+                                                    <div style="font-size:12px; color:#9fb3c8;">Draw <span style="float:right;">{draw_pct}%</span></div>
+                                                    <div style="background:#0b1220; height:10px; border-radius:6px; overflow:hidden; margin-top:6px;"><div style="width:{draw_pct}%; height:100%; background:linear-gradient(90deg,#ff6bff,#ffb86b);"></div></div>
+                                                </div>
+                                            </div>
+                                            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                                                <div style="flex:1;">
+                                                    <div style="font-size:12px; color:#9fb3c8;">Away Win <span style="float:right;">{away_pct}%</span></div>
+                                                    <div style="background:#0b1220; height:10px; border-radius:6px; overflow:hidden; margin-top:6px;"><div style="width:{away_pct}%; height:100%; background:linear-gradient(90deg,#00ff88,#00a86b);"></div></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <div style="margin-top:14px; display:flex; gap:12px;">
+                                <div style="flex:1; background:#071224; border-radius:8px; padding:12px; color:#e6f7ff;">
+                                    <div style="font-weight:700; margin-bottom:8px;">AI Explanation</div>
+                                    <div style="font-size:13px; color:#cfeafc; line-height:1.4;">{(prediction.get('aiExplanation') or '')}</div>
+                                </div>
+                                <div style="width:320px; background:#071224; border-radius:8px; padding:12px; color:#e6f7ff;">
+                                    <div style="font-weight:700; margin-bottom:8px;">Key Factors</div>
+                                    <ul style="margin:0; padding-left:18px; color:#cfeafc; font-size:13px;">
+"""
+
+        for f in prediction.get('keyFactors', []):
+            html += f"<li>{f}</li>"
+
+        html += f"""
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div style="margin-top:18px; color:rgba(255,255,255,0.65); font-size:12px;">This report was generated by Scoresight. For production delivery, configure SMTP or an email provider in the backend environment.</div>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
+
+
+        # Send email via SMTP helper if configured, otherwise save to file for dev
+        result = send_or_save_email(email, subject, html)
+        if result.get('success'):
+            return {
+                'success': True,
+                'message': result.get('message')
+            }
+        else:
+            # If send_or_save_email failed, raise a 500 so client sees an error
+            raise HTTPException(status_code=500, detail=result.get('error', 'Unknown error sending email'))
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Log server-side error and return proper HTTP 500 to the client
+        print(f"Email send error: {e}")
+        # Raise an HTTPException so the response has a 5xx status code instead of 200
+        raise HTTPException(status_code=500, detail=str(e))
     
 app.include_router(news_router)
 # =============================================================================

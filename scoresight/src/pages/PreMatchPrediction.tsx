@@ -24,6 +24,7 @@ import {
   ContentCopy
 } from '@mui/icons-material';
 import { footballAPI } from '../services/footballApi';
+import { useAuth } from '../contexts/AuthContext';
 
 // Add interface for Team
 interface Team {
@@ -40,6 +41,9 @@ const PreMatchPrediction: React.FC = () => {
   const [prediction, setPrediction] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [teamsLoading, setTeamsLoading] = useState(true);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<string | null>(null);
+  const { user, isAuthenticated } = useAuth();
 
   // Fetch teams from API
   useEffect(() => {
@@ -275,7 +279,7 @@ const PreMatchPrediction: React.FC = () => {
         </Box>
 
         {/* Action Buttons */}
-        <Box sx={{ display: 'flex', gap: 2, mt: 4 }}>
+        <Box sx={{ display: 'flex', gap: 2, mt: 4, alignItems: 'center' }}>
           <Button 
             variant="contained" 
             startIcon={<Share />}
@@ -292,6 +296,72 @@ const PreMatchPrediction: React.FC = () => {
           >
             Copy Results
           </Button>
+
+          {/* Email Report button - visible when user is signed in */}
+          <Button
+            variant="contained"
+            color="primary"
+            disabled={!isAuthenticated || emailSending}
+            sx={{ ml: 1, background: 'linear-gradient(45deg, #00d4ff, #ff6bff)', fontWeight: 700 }}
+            onClick={async () => {
+              // Send prediction + inputs to backend to email the user
+              if (!isAuthenticated || !user?.email) {
+                setEmailStatus('Please login to receive reports via email.');
+                return;
+              }
+
+              setEmailSending(true);
+              setEmailStatus(null);
+              try {
+                const homeTeamName = selectedHomeTeam?.name || '';
+                const awayTeamName = selectedAwayTeam?.name || '';
+
+                const payload = {
+                  email: user.email,
+                  inputs: {
+                    home_team: homeTeamName,
+                    away_team: awayTeamName
+                  },
+                  prediction: prediction
+                };
+
+                const res = await fetch('http://localhost:8000/api/send-prediction-email', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {       
+                  // Use server-provided message (may include saved file path or sent confirmation)
+                  setEmailStatus(data.message || `Email sent to ${user.email}`);
+                } else {
+                  const detail = data.detail || data.error || data.message || 'Failed to send email.';
+                  setEmailStatus(detail);
+                }
+              } catch (err: any) {
+                console.error('Email send error:', err);
+                setEmailStatus('Network error while sending email.');
+              } finally {
+                setEmailSending(false);
+              }
+            }}
+          >
+            {emailSending ? 'SENDING...' : 'Email Report'}
+          </Button>
+          {emailStatus && (
+            <Typography
+              variant="body2"
+              sx={{ ml: 2 }}
+              color={
+                emailStatus.toLowerCase().includes('sent') || emailStatus.toLowerCase().includes('saved')
+                  ? 'success.main'
+                  : 'error.main'
+              }
+            >
+              {emailStatus}
+            </Typography>
+          )}
         </Box>
       </CardContent>
     </Card>
