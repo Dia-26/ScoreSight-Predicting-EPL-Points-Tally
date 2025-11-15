@@ -15,12 +15,10 @@ const AuthPage: React.FC = () => {
     () => [
       // Pexels free football images
       'https://images.pexels.com/photos/46798/the-ball-stadion-football-the-pitch-46798.jpeg',
-      'https://images.pexels.com/photos/159555/soccer-football-sport-whistle-159555.jpeg',
       'https://images.pexels.com/photos/274422/pexels-photo-274422.jpeg',
       'https://images.pexels.com/photos/1884574/pexels-photo-1884574.jpeg',
       'https://images.pexels.com/photos/399187/pexels-photo-399187.jpeg',
       'https://images.pexels.com/photos/1171084/pexels-photo-1171084.jpeg',
-      'https://images.pexels.com/photos/1884554/pexels-photo-1884554.jpeg',
       'https://images.pexels.com/photos/47730/the-ball-stadion-football-the-pitch-47730.jpeg'
     ],
     []

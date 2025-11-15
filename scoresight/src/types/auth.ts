@@ -1,3 +1,5 @@
+import { FootballTeam } from './profile';
+
 export interface User {
   id: string;
   email: string;
@@ -5,6 +7,15 @@ export interface User {
   lastName: string;
   token: string;
   created_at?: string;
+  // Profile fields
+  displayName?: string;
+  phoneNumber?: string;
+  dateOfBirth?: string;
+  location?: string;
+  favoriteTeam?: FootballTeam;
+  avatarUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface LoginFormData {
@@ -29,4 +40,9 @@ export interface AuthContextType {
   loading: boolean;
   authMessage: string;
   clearMessage: () => void;
+  // Profile methods
+  updateProfile: (profileData: Partial<User>) => Promise<boolean>;
+  updateAvatar: (file: File) => Promise<boolean>;
+  setFavoriteTeam: (team: FootballTeam) => Promise<boolean>;
+  submitTestimonial: (rating: number, comment: string) => Promise<boolean>;
 }

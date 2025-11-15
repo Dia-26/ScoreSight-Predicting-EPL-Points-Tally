@@ -15,6 +15,7 @@ import AuthPage from './pages/AuthPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NewsProvider } from './contexts/NewsContext';
 import NewsPage from './pages/NewsPage';
+import UserProfile from './pages/UserProfile'; // Add this import
 
 const darkTheme = createTheme({
   palette: {
@@ -246,6 +247,19 @@ function AppContent() {
               <Layout>
                 <ApiStatus />
                 <NewsPage />
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* Add User Profile Route */}
+        <Route 
+          path="/profile" 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ApiStatus />
+                <UserProfile />
               </Layout>
             </ProtectedRoute>
           } 

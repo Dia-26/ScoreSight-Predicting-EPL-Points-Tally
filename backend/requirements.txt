@@ -12,4 +12,5 @@ google-generativeai==0.3.0  # For Gemini AI (REPLACES OpenAI)
 python-dotenv==1.0.0        # For environment variables (.env files)
 aiohttp==3.9.1              # For async HTTP requests
 joblib==1.3.2               # For model loading
-asyncio                     # For async operations (usually built-in)
+feedparser==6.1.1           # RSS feed parsing (BBC, Guardian, etc.)
+pydantic==2.5.1             # Data validation (used by FastAPI/Pydantic models)

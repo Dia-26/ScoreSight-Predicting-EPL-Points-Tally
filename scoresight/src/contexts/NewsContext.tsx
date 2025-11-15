@@ -4,6 +4,7 @@ import { NewsState, NewsArticle, BlogPost } from '../types/news';
 interface NewsContextType extends NewsState {
   fetchNews: () => Promise<void>;
   createBlog: (blogData: Partial<BlogPost>) => Promise<void>;
+  deleteBlog: (blogId: string) => Promise<void>;
   likeArticle: (articleId: string) => void;
   toggleSavedArticle: (articleId: string) => void;
   setFilters: (filters: Partial<NewsState['filters']>) => void;
@@ -19,6 +20,7 @@ type NewsAction =
   | { type: 'UPDATE_FILTERS'; payload: Partial<NewsState['filters']> }
   | { type: 'LIKE_ARTICLE'; payload: string }
   | { type: 'ADD_BLOG'; payload: BlogPost }
+  | { type: 'DELETE_BLOG'; payload: string }
   | { type: 'TOGGLE_SAVED_ARTICLE'; payload: string }
   | { type: 'SET_SAVED_ARTICLES'; payload: string[] };
 
@@ -47,6 +49,11 @@ const newsReducer = (state: NewsState, action: NewsAction): NewsState => {
       return {
         ...state,
         userBlogs: [action.payload, ...state.userBlogs]
+      };
+    case 'DELETE_BLOG':
+      return {
+        ...state,
+        userBlogs: state.userBlogs.filter(b => b.id !== action.payload)
       };
     case 'TOGGLE_SAVED_ARTICLE':
       const articleId = action.payload;
@@ -189,6 +196,18 @@ export const NewsProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const deleteBlog = async (blogId: string) => {
+    try {
+      dispatch({ type: 'DELETE_BLOG', payload: blogId });
+      // Persist removal to localStorage
+      const updated = state.userBlogs.filter(b => b.id !== blogId);
+      localStorage.setItem('userBlogs', JSON.stringify(updated));
+    } catch (err) {
+      console.error('Error deleting blog:', err);
+      throw err;
+    }
+  };
+
   const likeArticle = (articleId: string) => {
     dispatch({ type: 'LIKE_ARTICLE', payload: articleId });
   };
@@ -212,6 +231,7 @@ export const NewsProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       ...state,
       fetchNews,
       createBlog,
+      deleteBlog,
       likeArticle,
       toggleSavedArticle,
       setFilters

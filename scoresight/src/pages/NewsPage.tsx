@@ -28,7 +28,8 @@ import {
   Comment,
   Bookmark,
   BookmarkBorder,
-  Article
+  Article,
+  Delete
 } from '@mui/icons-material';
 import { useNews } from '../contexts/NewsContext';
 import { NewsArticle } from '../types/news';
@@ -46,6 +47,7 @@ const NewsPage: React.FC = () => {
     createBlog,
     likeArticle,
     toggleSavedArticle,
+    deleteBlog,
     setFilters
   } = useNews();
 
@@ -341,47 +343,64 @@ const NewsPage: React.FC = () => {
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {userBlogs.map(blog => (
-                  <Paper 
-                    key={blog.id} 
-                    sx={{ 
-                      p: 3, 
-                      background: 'linear-gradient(135deg, rgba(0, 212, 255, 0.05) 0%, rgba(255, 107, 255, 0.05) 100%)',
-                      border: '1px solid rgba(0, 212, 255, 0.2)',
-                      borderRadius: 2,
-                      cursor: 'pointer',
-                      '&:hover': {
-                        borderColor: '#00d4ff',
-                        transform: 'translateY(-2px)',
-                        transition: 'all 0.3s ease'
-                      }
-                    }}
-                  >
-                    <Typography variant="h6" fontWeight="600" gutterBottom sx={{ color: '#ffffff' }}>
-                      {blog.title}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2, lineHeight: 1.6 }}>
-                      {blog.excerpt}
-                    </Typography>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                        {blog.tags.map(tag => (
-                          <Chip 
-                            key={tag} 
-                            label={tag} 
-                            size="small" 
-                            sx={{ 
-                              backgroundColor: 'rgba(255, 107, 255, 0.1)',
-                              color: '#ff6bff',
-                              border: '1px solid rgba(255, 107, 255, 0.3)'
-                            }}
-                          />
-                        ))}
+                    <Paper 
+                      key={blog.id} 
+                      sx={{ 
+                        p: 3, 
+                        background: 'linear-gradient(135deg, rgba(0, 212, 255, 0.05) 0%, rgba(255, 107, 255, 0.05) 100%)',
+                        border: '1px solid rgba(0, 212, 255, 0.2)',
+                        borderRadius: 2,
+                        cursor: 'pointer',
+                        position: 'relative',
+                        '&:hover': {
+                          borderColor: '#00d4ff',
+                          transform: 'translateY(-2px)',
+                          transition: 'all 0.3s ease'
+                        }
+                      }}
+                    >
+                      <Box sx={{ position: 'absolute', top: 8, right: 8 }}>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const confirmDelete = window.confirm('Delete this blog? This action cannot be undone.');
+                            if (confirmDelete) {
+                              deleteBlog && deleteBlog(blog.id);
+                            }
+                          }}
+                          sx={{ color: 'rgba(255,255,255,0.8)' }}
+                        >
+                          <Delete />
+                        </IconButton>
                       </Box>
-                      <Typography variant="caption" color="text.secondary">
-                        {new Date(blog.publishedAt).toLocaleDateString()}
+
+                      <Typography variant="h6" fontWeight="600" gutterBottom sx={{ color: '#ffffff' }}>
+                        {blog.title}
                       </Typography>
-                    </Box>
-                  </Paper>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2, lineHeight: 1.6 }}>
+                        {blog.excerpt}
+                      </Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                          {blog.tags.map(tag => (
+                            <Chip 
+                              key={tag} 
+                              label={tag} 
+                              size="small" 
+                              sx={{ 
+                                backgroundColor: 'rgba(255, 107, 255, 0.1)',
+                                color: '#ff6bff',
+                                border: '1px solid rgba(255, 107, 255, 0.3)'
+                              }}
+                            />
+                          ))}
+                        </Box>
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(blog.publishedAt).toLocaleDateString()}
+                        </Typography>
+                      </Box>
+                    </Paper>
                 ))}
               </Box>
             )}

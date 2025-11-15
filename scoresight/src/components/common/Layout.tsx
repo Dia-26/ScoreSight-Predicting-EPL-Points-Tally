@@ -6,8 +6,8 @@ import {
   Container,
   Box,
   Button,
-  Chip,
-  Avatar
+  Avatar,
+  Chip
 } from '@mui/material';
 import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
 import { Logout } from '@mui/icons-material';
@@ -37,43 +37,84 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     navigate('/auth');
   };
 
+  const isActivePath = (path: string) => {
+    if (path === '/') {
+      return location.pathname === '/';
+    }
+    return location.pathname.startsWith(path);
+  };
+
   return (
-    <Box sx={{ flexGrow: 1, background: 'linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%)', minHeight: '100vh' }}>
+    <Box sx={{ 
+      flexGrow: 1, 
+      background: 'linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%)',
+      minHeight: '100vh'
+    }}>
       <AppBar 
         position="static" 
         sx={{ 
-          background: 'rgba(26, 26, 46, 0.8)',
-          backdropFilter: 'blur(20px)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+          background: 'rgba(15, 15, 35, 0.95)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 2px 20px rgba(0, 0, 0, 0.3)'
         }}
       >
-        <Toolbar>
-          <SportsSoccerIcon sx={{ mr: 2, color: '#00d4ff' }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 700, color: '#00d4ff' }}>
-            SCORESIGHT
-          </Typography>
+        <Toolbar sx={{ py: 1.5 }}>
+          {/* Logo */}
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              mr: 4,
+              cursor: 'pointer'
+            }}
+            onClick={() => navigate('/')}
+          >
+            <SportsSoccerIcon sx={{ 
+              mr: 2, 
+              color: '#00d4ff',
+              fontSize: 32
+            }} />
+            <Typography 
+              variant="h5" 
+              component="div" 
+              sx={{ 
+                fontWeight: 800,
+                color: '#00d4ff',
+                letterSpacing: 1
+              }}
+            >
+              SCORESIGHT
+            </Typography>
+          </Box>
           
-          {/* Navigation Items */}
-          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1 }}>
+          {/* Navigation */}
+          <Box sx={{ 
+            display: { xs: 'none', md: 'flex' }, 
+            alignItems: 'center', 
+            gap: 1,
+            flexGrow: 1
+          }}>
             {navItems.map((item) => (
               <Button
                 key={item.path}
-                color="inherit"
                 onClick={() => navigate(item.path)}
                 sx={{ 
-                  mx: 0.5,
-                  background: location.pathname === item.path 
-                    ? 'linear-gradient(45deg, #00d4ff, #ff6bff)' 
-                    : 'transparent',
-                  color: location.pathname === item.path ? 'black' : 'white',
+                  color: 'white',
                   fontWeight: 600,
-                  fontSize: '0.875rem',
-                  px: 2,
+                  fontSize: '0.9rem',
+                  px: 2.5,
                   py: 1,
+                  borderRadius: 2,
+                  background: isActivePath(item.path) 
+                    ? 'rgba(0, 212, 255, 0.2)' 
+                    : 'transparent',
+                  border: isActivePath(item.path) 
+                    ? '1px solid rgba(0, 212, 255, 0.3)' 
+                    : '1px solid transparent',
                   '&:hover': {
-                    background: location.pathname === item.path 
-                      ? 'linear-gradient(45deg, #00d4ff, #ff6bff)'
-                      : 'rgba(255, 255, 255, 0.1)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)'
                   }
                 }}
               >
@@ -82,19 +123,73 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             ))}
           </Box>
 
-          {/* User welcome and logout button */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, ml: 2 }}>
-            {/* Removed top-bar welcome text to free horizontal space */}
+          {/* User Section */}
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 3
+          }}>
+            {/* User Profile */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                cursor: 'pointer',
+                px: 2,
+                py: 1,
+                borderRadius: 2,
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  background: 'rgba(255, 255, 255, 0.05)'
+                }
+              }}
+              onClick={() => navigate('/profile')}
+            >
+              <Avatar 
+                sx={{ 
+                  width: 36, 
+                  height: 36, 
+                  bgcolor: '#00d4ff',
+                  fontWeight: 600,
+                  fontSize: '0.9rem'
+                }}
+              >
+                {user?.firstName?.[0]?.toUpperCase() || 'U'}
+              </Avatar>
+              <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                <Typography
+                  variant="body2"
+                  sx={{ 
+                    fontWeight: 600,
+                    color: 'white'
+                  }}
+                >
+                  {user?.firstName}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{ 
+                    color: 'rgba(255,255,255,0.7)'
+                  }}
+                >
+                  View Profile
+                </Typography>
+              </Box>
+            </Box>
+
+
+            {/* Logout Button */}
             <Button
-              color="inherit"
               onClick={handleLogout}
               startIcon={<Logout />}
               sx={{
                 color: '#ff6b6b',
-                border: '1px solid #ff6b6b',
+                fontWeight: 600,
+                fontSize: '0.9rem',
                 px: 2,
                 '&:hover': {
-                  backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                  background: 'rgba(255, 107, 107, 0.1)'
                 }
               }}
             >
@@ -104,35 +199,56 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </Toolbar>
       </AppBar>
       
+      {/* Main Content */}
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+        {/* Welcome Message */}
         {user && (
           <Box
             sx={{
-              mb: 3,
+              mb: 4,
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 1.5,
-              px: 2.2,
-              py: 1.2,
-              borderRadius: 999,
-              background: 'linear-gradient(90deg, rgba(0,212,255,0.18) 0%, rgba(255,107,255,0.18) 100%)',
-              border: '1px solid rgba(255,255,255,0.16)',
-              boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
-              transition: 'transform .2s ease, box-shadow .2s ease',
-              '&:hover': { transform: 'translateY(-1px)', boxShadow: '0 10px 28px rgba(0,0,0,0.2)' }
+              gap: 2,
+              px: 3,
+              py: 2,
+              borderRadius: 2,
+              background: 'rgba(0, 212, 255, 0.1)',
+              border: '1px solid rgba(0, 212, 255, 0.2)'
             }}
           >
-            <Avatar sx={{ bgcolor: '#00d4ff', color: '#0b0b0b', fontWeight: 800, width: 34, height: 34, fontSize: '0.95rem' }}>
-              {user.firstName?.[0]?.toUpperCase() || 'U'}
-            </Avatar>
-            <Typography
-              variant="h6"
-              sx={{ m: 0, p: 0, fontWeight: 800, letterSpacing: 0.2 }}
+            <Avatar 
+              sx={{ 
+                width: 40, 
+                height: 40, 
+                bgcolor: '#00d4ff',
+                fontWeight: 700
+              }}
             >
-              {`Welcome, ${user.firstName}`}
-            </Typography>
+              {user.firstName?.[0]?.toUpperCase()}
+            </Avatar>
+            <Box>
+              <Typography
+                variant="h6"
+                sx={{ 
+                  fontWeight: 700,
+                  color: 'white'
+                }}
+              >
+                Welcome back, {user.firstName}!
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ 
+                  color: 'rgba(255,255,255,0.8)'
+                }}
+              >
+                Ready for today's predictions?
+              </Typography>
+            </Box>
           </Box>
         )}
+
+        {/* Page Content */}
         {children}
       </Container>
     </Box>

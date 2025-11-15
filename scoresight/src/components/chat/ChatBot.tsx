@@ -11,10 +11,11 @@ import {
   Chip,
   CircularProgress,
   Fade,
-  Zoom
+  ToggleButtonGroup,
+  ToggleButton
 } from '@mui/material';
 import './ChatBot.css';
-import { Send, SmartToy, Person, Psychology, AutoAwesome } from '@mui/icons-material';
+import { Send, SmartToy, Person, Psychology, AutoAwesome, Mic, MicOff, VolumeUp, VolumeOff } from '@mui/icons-material';
 import { chatService, ChatMessage } from '../../services/chatService';
 import './ChatBot.css';
 
@@ -29,14 +30,51 @@ const ChatBot: React.FC = () => {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [ttsMode, setTtsMode] = useState<'always'|'on_demand'|'off'>(() => {
+    try { return (localStorage.getItem('scoresight_tts_mode') as any) || 'on_demand' } catch { return 'on_demand' }
+  });
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     loadSuggestions();
     scrollToBottom();
+    // Initialize SpeechRecognition if available
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recog = new SpeechRecognition();
+      recog.lang = 'en-US';
+      recog.interimResults = false;
+      recog.maxAlternatives = 1;
+
+      recog.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(prev => (prev ? `${prev} ${transcript}` : transcript));
+        // Auto-send after receiving final transcript
+        setTimeout(() => handleSend(), 300);
+      };
+
+      recog.onend = () => {
+        setIsListening(false);
+      };
+
+      recog.onerror = (e: any) => {
+        console.error('Speech recognition error', e);
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recog;
+    }
   }, []);
+
+  // Persist TTS mode
+  useEffect(() => {
+    try { localStorage.setItem('scoresight_tts_mode', ttsMode); } catch {}
+  }, [ttsMode]);
 
   useEffect(() => {
     scrollToBottom();
@@ -79,6 +117,25 @@ const ChatBot: React.FC = () => {
       };
       
       setMessages(prev => [...prev, aiMessage]);
+      // Speak the AI response (Text-to-Speech) depending on ttsMode
+      try {
+        if (ttsMode === 'always' && 'speechSynthesis' in window) {
+          try {
+            window.speechSynthesis.cancel();
+            const utter = new SpeechSynthesisUtterance(response.response);
+            utter.lang = 'en-US';
+            utter.onstart = () => setIsSpeaking(true);
+            utter.onend = () => setIsSpeaking(false);
+            utter.onerror = () => setIsSpeaking(false);
+            window.speechSynthesis.speak(utter);
+          } catch (e) {
+            console.error('TTS error', e);
+            setIsSpeaking(false);
+          }
+        }
+      } catch (e) {
+        console.error('TTS error', e);
+      }
     } catch (error) {
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -90,6 +147,32 @@ const ChatBot: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const startListening = () => {
+    const recog = recognitionRef.current;
+    if (!recog) return;
+    try {
+      recog.start();
+      setIsListening(true);
+    } catch (e) {
+      console.error('Failed to start recognition', e);
+    }
+  };
+
+  const stopListening = () => {
+    const recog = recognitionRef.current;
+    if (!recog) return;
+    try {
+      recog.stop();
+      setIsListening(false);
+    } catch (e) {
+      console.error('Failed to stop recognition', e);
+    }
+  };
+
+  const toggleListening = () => {
+    if (isListening) stopListening(); else startListening();
   };
 
   const handleQuickQuestion = (question: string) => {
@@ -209,23 +292,53 @@ const ChatBot: React.FC = () => {
               </Box>
             </Typography>
           </Box>
-          <Chip
-            className="clear-button"
-            label="Clear Chat"
-            size="small"
-            onClick={clearChat}
-            sx={{ 
-              borderColor: '#ff6b6b', 
-              color: '#ff6b6b',
-              background: 'rgba(255,107,107,0.1)',
-              transition: 'all 0.3s ease',
-              '&:hover': { 
-                bgcolor: 'rgba(255,107,107,0.2)', 
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <ToggleButtonGroup
+              value={ttsMode}
+              exclusive
+              onChange={(_, val) => { if (val) setTtsMode(val); }}
+              size="small"
+              sx={{ mr: 1 }}
+            >
+              <ToggleButton value="always" sx={{ color: ttsMode === 'always' ? '#00ff88' : undefined }}>Always</ToggleButton>
+              <ToggleButton value="on_demand" sx={{ color: ttsMode === 'on_demand' ? '#00d4ff' : undefined }}>On demand</ToggleButton>
+              <ToggleButton value="off" sx={{ color: ttsMode === 'off' ? '#ff6b6b' : undefined }}>Off</ToggleButton>
+            </ToggleButtonGroup>
+
+            <IconButton
+              size="small"
+              onClick={() => {
+                try {
+                  if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    setIsSpeaking(false);
+                  }
+                } catch (e) { console.error('Stop TTS error', e); }
+              }}
+              title="Stop speaking"
+              sx={{ color: isSpeaking ? '#ff6b6b' : 'rgba(255,255,255,0.6)', mr: 1 }}
+            >
+              <VolumeOff fontSize="small" />
+            </IconButton>
+
+            <Chip
+              className="clear-button"
+              label="Clear Chat"
+              size="small"
+              onClick={clearChat}
+              sx={{ 
+                borderColor: '#ff6b6b', 
                 color: '#ff6b6b',
-                transform: 'scale(1.05)'
-              }
-            }}
-          />
+                background: 'rgba(255,107,107,0.1)',
+                transition: 'all 0.3s ease',
+                '&:hover': { 
+                  bgcolor: 'rgba(255,107,107,0.2)', 
+                  color: '#ff6b6b',
+                  transform: 'scale(1.05)'
+                }
+              }}
+            />
+          </Box>
         </Box>
 
         {/* Messages Container with FIXED Scrollbar */}
@@ -311,16 +424,48 @@ const ChatBot: React.FC = () => {
                       lineHeight: 1.4
                     }}>
                       {message.content}
-                    </Typography>                    {message.role === 'assistant' && message.source && (
+                    </Typography>
+                    {message.role === 'assistant' && (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                        <Typography variant="caption" sx={{ 
-                          color: getSourceColor(message.source),
-                          fontWeight: 'bold'
-                        }}>
-                          {message.source === 'ml_model' && '🤖 ML Prediction Model'}
-                          {message.source === 'team_analyzer' && '📊 Historical Data Analysis'}
-                          {message.source === 'chatgpt' && '🌐 General Knowledge'}
-                        </Typography>
+                        {message.source && (
+                          <Typography variant="caption" sx={{ 
+                            color: getSourceColor(message.source),
+                            fontWeight: 'bold'
+                          }}>
+                            {message.source === 'ml_model' && '🤖 ML Prediction Model'}
+                            {message.source === 'team_analyzer' && '📊 Historical Data Analysis'}
+                            {message.source === 'chatgpt' && '🌐 General Knowledge'}
+                          </Typography>
+                        )}
+
+                        {ttsMode !== 'always' && (
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              try {
+                                if (!('speechSynthesis' in window)) return;
+                                // If currently speaking, stop immediately
+                                if (window.speechSynthesis.speaking) {
+                                  window.speechSynthesis.cancel();
+                                  setIsSpeaking(false);
+                                  return;
+                                }
+                                // Speak this message
+                                window.speechSynthesis.cancel();
+                                const utter = new SpeechSynthesisUtterance(message.content);
+                                utter.lang = 'en-US';
+                                utter.onstart = () => setIsSpeaking(true);
+                                utter.onend = () => setIsSpeaking(false);
+                                utter.onerror = () => setIsSpeaking(false);
+                                window.speechSynthesis.speak(utter);
+                              } catch (e) { console.error('TTS read error', e); setIsSpeaking(false); }
+                            }}
+                            sx={{ color: '#00d4ff' }}
+                            title={isSpeaking ? 'Stop' : 'Read aloud'}
+                          >
+                            {isSpeaking ? <VolumeOff fontSize="small" /> : <VolumeUp fontSize="small" />}
+                          </IconButton>
+                        )}
                       </Box>
                     )}
                   </Paper>
@@ -418,6 +563,20 @@ const ChatBot: React.FC = () => {
                 },
               }}
             />
+            <IconButton
+              onClick={toggleListening}
+              disabled={isLoading || !recognitionRef.current}
+              sx={{
+                bgcolor: isListening ? '#ff6b6b' : 'rgba(255,255,255,0.06)',
+                color: isListening ? 'white' : '#00d4ff',
+                '&:hover': { bgcolor: isListening ? '#ff5252' : '#00b8e6' }
+              }}
+              aria-label={isListening ? 'Stop recording' : 'Start recording'}
+              title={isListening ? 'Stop recording' : 'Ask by voice'}
+            >
+              {isListening ? <MicOff /> : <Mic />}
+            </IconButton>
+
             <IconButton 
               onClick={handleSend}
               disabled={!input.trim() || isLoading}

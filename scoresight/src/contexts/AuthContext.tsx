@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, AuthContextType } from '../types/auth';
+import { UserProfile, FootballTeam } from '../types/profile';
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Export AuthContext
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -10,6 +12,7 @@ interface AuthProviderProps {
 const API_BASE_URL = 'http://localhost:8000';
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  // ... rest of your AuthProvider code remains the same
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authMessage, setAuthMessage] = useState<string>('');
@@ -64,6 +67,148 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.setItem('scoresight_token', userData.token);
     localStorage.setItem('scoresight_user', JSON.stringify(userData));
     setUser(userData);
+  };
+
+  const updateLocalUser = (updates: Partial<UserProfile>) => {
+    if (user) {
+      const updatedUser = {
+        ...user,
+        ...updates,
+        updatedAt: new Date().toISOString()
+      };
+      setUser(updatedUser);
+      localStorage.setItem('scoresight_user', JSON.stringify(updatedUser));
+    }
+  };
+
+  const updateProfile = async (profileData: Partial<UserProfile>): Promise<boolean> => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('scoresight_token');
+      
+      if (!token || !user) {
+        setAuthMessage('Please log in to update your profile');
+        return false;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(profileData),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.user) {
+          updateLocalUser(data.user);
+          setAuthMessage('Profile updated successfully! ✅');
+          return true;
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.log('Profile update error:', errorData);
+        setAuthMessage('Failed to update profile. Please try again.');
+      }
+      return false;
+    } catch (error: any) {
+      console.error('Profile update failed:', error);
+      setAuthMessage('Network error. Check your connection and try again! 📡');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateAvatar = async (file: File): Promise<boolean> => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('scoresight_token');
+      
+      if (!token || !user) {
+        setAuthMessage('Please log in to update your avatar');
+        return false;
+      }
+
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.avatarUrl) {
+          updateLocalUser({ avatarUrl: data.avatarUrl });
+          setAuthMessage('Profile picture updated successfully! 📸');
+          return true;
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.log('Avatar upload error:', errorData);
+        setAuthMessage('Failed to upload profile picture. Please try again.');
+      }
+      return false;
+    } catch (error: any) {
+      console.error('Avatar upload failed:', error);
+      setAuthMessage('Network error. Check your connection and try again! 📡');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const setFavoriteTeam = async (team: FootballTeam): Promise<boolean> => {
+    return await updateProfile({ favoriteTeam: team });
+  };
+
+  const submitTestimonial = async (rating: number, comment: string): Promise<boolean> => {
+    try {
+      const token = localStorage.getItem('scoresight_token');
+      
+      if (!token || !user) {
+        setAuthMessage('Please log in to submit feedback');
+        return false;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/testimonials`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          rating,
+          comment,
+          userId: user.id,
+          userName: user.displayName || user.email
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setAuthMessage('Thank you for your feedback! Your testimonial has been submitted. 🌟');
+          return true;
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.log('Testimonial submission error:', errorData);
+        setAuthMessage('Failed to submit feedback. Please try again.');
+      }
+      return false;
+    } catch (error: any) {
+      console.error('Testimonial submission failed:', error);
+      setAuthMessage('Network error. Check your connection and try again! 📡');
+      return false;
+    }
   };
 
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -185,7 +330,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated: !!user,
     loading,
     authMessage,
-    clearMessage
+    clearMessage,
+    updateProfile,
+    updateAvatar,
+    setFavoriteTeam,
+    submitTestimonial
   };
 
   return (
