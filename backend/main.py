@@ -18,6 +18,8 @@ import re
 from dotenv import load_dotenv
 from fastapi import APIRouter
 from news_service import news_service
+from fastapi.middleware.cors import CORSMiddleware
+
 
 
 # Load environment variables from .env file
@@ -705,10 +707,12 @@ except ImportError as e:
 
 app = FastAPI(title="Scoresight API", version="1.0.0")
 
-# CORS middleware to allow React frontend to access the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React app URL
+    allow_origins=[
+        "https://scoresight.netlify.app",
+        "http://localhost:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
