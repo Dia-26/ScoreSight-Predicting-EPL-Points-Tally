@@ -29,19 +29,8 @@ import {
   ShowChart,
   Timeline
 } from '@mui/icons-material';
-
-const footballAPI = {
-  getTeams: async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/teams');
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error fetching teams:', error);
-      return { teams: [] };
-    }
-  }
-};
+import API_BASE_URL from '../config/api';
+import { footballAPI } from '../services/footballApi';
 
 interface Team {
   id: number;
@@ -117,7 +106,7 @@ const HalfTimePrediction: React.FC = () => {
     
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/half-time-predict`, {
+      const response = await fetch(`${API_BASE_URL}/api/half-time-predict`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

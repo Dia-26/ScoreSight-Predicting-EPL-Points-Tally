@@ -1,7 +1,8 @@
 import { NewsArticle, BlogPost } from '../types/news';
+import API_BASE_URL from '../config/api';
 
 class NewsService {
-  private baseUrl = 'http://localhost:8000/api/news';
+  private baseUrl = `${API_BASE_URL}/api/news`;
 
   // Get latest news from backend
   async getLatestNews(limit: number = 20): Promise<NewsArticle[]> {

@@ -123,7 +123,9 @@ export const NewsProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchNews = async () => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      const response = await fetch('http://localhost:8000/api/news/epl?limit=20');
+      const response = await fetch(
+  `${process.env.REACT_APP_API_BASE_URL}/api/news/epl?limit=20`
+);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

@@ -23,6 +23,7 @@ import {
   Share,
   ContentCopy
 } from '@mui/icons-material';
+import API_BASE_URL from '../config/api';
 import { footballAPI } from '../services/footballApi';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -83,7 +84,7 @@ const PreMatchPrediction: React.FC = () => {
       
       // Call your backend for real predictions WITH TEAM NAMES
       const response = await fetch(
-        `http://localhost:8000/api/predict?home_team=${encodeURIComponent(homeTeamObj.name)}&away_team=${encodeURIComponent(awayTeamObj.name)}`
+        `${API_BASE_URL}/api/predict?home_team=${encodeURIComponent(homeTeamObj.name)}&away_team=${encodeURIComponent(awayTeamObj.name)}`
       );
       
       console.log('Response status:', response.status);
@@ -325,7 +326,7 @@ const PreMatchPrediction: React.FC = () => {
                   prediction: prediction
                 };
 
-                const res = await fetch('http://localhost:8000/api/send-prediction-email', {
+                const res = await fetch(`${API_BASE_URL}/api/send-prediction-email`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(payload)

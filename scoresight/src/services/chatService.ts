@@ -1,4 +1,5 @@
 // scoresight/src/services/chatService.ts
+import API_BASE_URL from '../config/api';
 
 export interface ChatMessage {
   id: string;
@@ -23,7 +24,8 @@ export interface Suggestion {
 }
 
 class ChatService {
-  private baseUrl = 'http://localhost:8000'; // Your FastAPI backend
+  private baseUrl = process.env.REACT_APP_API_BASE_URL as string;
+ // Your FastAPI backend
 
   async sendMessage(message: string): Promise<ChatResponse> {
     try {

@@ -110,7 +110,7 @@ const PredictionPage: React.FC = () => {
 
   const fetchTeams = async (): Promise<void> => {
     try {
-      const response = await fetch('http://localhost:8000/api/teams');
+      const response = await fetch(`${API_BASE_URL}/api/teams`);
       const data = await response.json();
       setTeams(data.teams || []);
     } catch (err) {
@@ -182,7 +182,7 @@ const PredictionPage: React.FC = () => {
         away_pass_accuracy: formData.awayPassAccuracy
       };
 
-      const response = await fetch('http://localhost:8000/api/predict-detailed', {
+      const response = await fetch(`${API_BASE_URL}/api/predict-detailed`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
