@@ -11,16 +11,13 @@ import {
   Tab,
   Chip,
   Button,
-  Grid,
   CircularProgress,
   Alert
 } from '@mui/material';
 import {
   TrendingUp,
-  TrendingDown,
   Equalizer,
   EmojiEvents,
-  Schedule,
   Group,
   SportsSoccer,
   Insights

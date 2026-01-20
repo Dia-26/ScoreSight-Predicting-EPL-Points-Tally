@@ -24,7 +24,8 @@ export interface Suggestion {
 }
 
 class ChatService {
-  private baseUrl = process.env.REACT_APP_API_BASE_URL as string;
+  private baseUrl = API_BASE_URL;
+
  // Your FastAPI backend
 
   async sendMessage(message: string): Promise<ChatResponse> {
