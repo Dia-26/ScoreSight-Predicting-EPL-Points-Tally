@@ -39,6 +39,7 @@ import {
   Whatshot
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import API_BASE_URL from '../config/api';
 
 interface Team {
   id: number;
